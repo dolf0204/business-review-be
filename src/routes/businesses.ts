@@ -1,10 +1,12 @@
 import type { FastifyInstance } from "fastify";
+import QRCode from "qrcode";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
+import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { ownedBusiness } from "../lib/access.js";
 import { businessView, MAX_BUSINESSES_PER_OWNER, publishProblem } from "../lib/businessView.js";
-import { newCode } from "../lib/code.js";
+import { newCode, shareUrl } from "../lib/code.js";
 import { findPlaces, placeDetails, PlacesError } from "../lib/googlePlaces.js";
 import { idParam, KINDS, profileSchema } from "../schemas.js";
 
@@ -65,6 +67,25 @@ export async function businessRoutes(app: FastifyInstance) {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
     return businessView(await prisma.business.update({ where: { id: b.id }, data: { publishedAt: null } }));
+  });
+
+  // The address in the QR code and on the NFC tag. It never changes, so a printed code survives every later edit.
+  r.get("/businesses/:id/share", { ...auth, schema: { params: idParam } }, async (req, reply) => {
+    const b = await ownedBusiness(req.user.sub, req.params.id);
+    if (!b) return reply.code(404).send({ error: "not_found" });
+    return { qrUrl: shareUrl(config.APP_URL, b.code, "qr"), nfcUrl: shareUrl(config.APP_URL, b.code, "nfc") };
+  });
+
+  r.get("/businesses/:id/qr", {
+    ...auth,
+    schema: { params: idParam, querystring: z.object({ format: z.enum(["svg", "png"]).default("svg"), size: z.coerce.number().int().min(200).max(2000).default(1000) }) },
+  }, async (req, reply) => {
+    const b = await ownedBusiness(req.user.sub, req.params.id);
+    if (!b) return reply.code(404).send({ error: "not_found" });
+    const url = shareUrl(config.APP_URL, b.code, "qr");
+    const opts = { errorCorrectionLevel: "M" as const, margin: 2, width: req.query.size };
+    if (req.query.format === "png") return reply.type("image/png").send(await QRCode.toBuffer(url, opts));
+    return reply.type("image/svg+xml").send(await QRCode.toString(url, { ...opts, type: "svg" }));
   });
 
   // Step 1 of connecting to Google: find the place from a pasted Google Maps link, or from a typed name and town.

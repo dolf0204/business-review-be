@@ -9,6 +9,7 @@ import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { businessRoutes } from "./routes/businesses.js";
 import { healthRoutes } from "./routes/health.js";
+import { publicRoutes } from "./routes/public.js";
 import { partnerRoutes } from "./routes/partners.js";
 
 declare module "fastify" {
@@ -70,5 +71,6 @@ export async function buildApp() {
   await app.register(authRoutes);
   await app.register(businessRoutes);
   await app.register(partnerRoutes);
+  await app.register(publicRoutes);
   return app;
 }
