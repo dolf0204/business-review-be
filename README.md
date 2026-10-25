@@ -106,6 +106,7 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Guests (slice 3) | `POST /public/b/:code/join` (email link, Turnstile, 5 links per hour per address), `POST /guest/verify`, `GET/PATCH /guest/me`, `POST /guest/logout`, `POST /guest/b/:code/join` (signed-in guest joins another business), `PUT /guest/b/:code/marketing` (give or withdraw consent for offers by email) |
 | News (slice 3) | `GET/POST /businesses/:id/posts`, `DELETE /posts/:id` (max 20 per business); the latest 5 live posts are part of `GET /public/b/:code` |
 | Reviews (slice 4) | `POST /guest/b/:code/visit` (counts a visit once per day, answers what to ask: `google`, `tripadvisor` or nothing), `POST /guest/b/:code/review/:platform/decline`, `GET /r/:code/:platform` (counts the click, then redirects to the stored Google or Tripadvisor link), `GET /businesses/:id/stats` |
+| Loyalty (slice 5) | Owner: `GET/PUT /businesses/:id/loyalty` (program and today's staff code). Guest: `GET /guest/b/:code/loyalty`, `POST .../loyalty/punch` (location or staff code), `POST .../loyalty/redeem` (staff code). The rule is shown to everyone in `GET /public/b/:code`. |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -118,7 +119,7 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-71 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+87 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
 
 ## Guests and privacy (slice 3)
 
@@ -138,3 +139,18 @@ Rules live in `src/lib/reviews.ts` and are tested: Google is asked first and Tri
 declines Google is not pushed on to Tripadvisor; "no thanks" is asked again after 3 more visits (a visit is one calendar day, UTC, on which
 the guest opened the page); following a link finishes that platform for good. We can only know the link was followed, not that a review
 was posted. The redirect target comes only from the business's stored links, so `/r/...` cannot be used as an open redirect.
+
+## Loyalty card (slice 5)
+
+A business has one program: `goal` stamps (2 to 50), a reward text, an optional start and end date, and a radius (150 m, fixed). It can only be
+switched on once the business is connected to Google, because the location check needs the business's position. A card copies goal and reward
+when it starts, so editing the program never changes a card in progress.
+
+A stamp needs proof that the guest is there: the phone is within the radius (the phone's reported accuracy is allowed for, up to 100 m), or the guest
+typed **today's staff code**: six digits derived from the server secret, the business and the date, so it changes every day, is never stored, and cannot
+be worked out for another day. The same code lets staff redeem a full card on the guest's phone. Guesses are limited to 10 per 10 minutes per guest.
+One stamp per guest per business per day is enforced by the database (unique membership and day), so a double tap cannot give two. Rules are in
+`src/lib/loyalty.ts` and tested.
+
+Known limits: a location can be faked by a determined guest; the staff code is a shared secret among staff; redeeming is not limited to the program's dates.
+Browsers give a location only on HTTPS pages (and localhost), so tests on a phone over plain `http://<address>` use the staff code.
