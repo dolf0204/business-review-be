@@ -107,6 +107,7 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | News (slice 3) | `GET/POST /businesses/:id/posts`, `DELETE /posts/:id` (max 20 per business); the latest 5 live posts are part of `GET /public/b/:code` |
 | Reviews (slice 4) | `POST /guest/b/:code/visit` (counts a visit once per day, answers what to ask: `google`, `tripadvisor` or nothing), `POST /guest/b/:code/review/:platform/decline`, `GET /r/:code/:platform` (counts the click, then redirects to the stored Google or Tripadvisor link), `GET /businesses/:id/stats` |
 | Loyalty (slice 5) | Owner: `GET/PUT /businesses/:id/loyalty` (program and today's staff code). Guest: `GET /guest/b/:code/loyalty`, `POST .../loyalty/punch` (location or staff code), `POST .../loyalty/redeem` (staff code). The rule is shown to everyone in `GET /public/b/:code`. |
+| Offers by email (slice 6) | Owner: `GET/POST /businesses/:id/campaigns` (send to guests who agreed; one a week; answers 202 and sends in the background), `POST /businesses/:id/campaigns/test` (preview to the owner's address). Public: `POST /public/unsubscribe`, `POST /public/unsubscribe/:m/:t` (one-click) |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -119,7 +120,7 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-87 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+100 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
 
 ## Guests and privacy (slice 3)
 
@@ -154,3 +155,15 @@ One stamp per guest per business per day is enforced by the database (unique mem
 
 Known limits: a location can be faked by a determined guest; the staff code is a shared secret among staff; redeeming is not limited to the program's dates.
 Browsers give a location only on HTTPS pages (and localhost), so tests on a phone over plain `http://<address>` use the staff code.
+
+## Offers by email (slice 6)
+
+The owner writes a subject (80 characters) and a plain-text message (1000); it is escaped and laid out by `src/lib/offerMail.ts`, so nothing typed is
+treated as HTML. It goes to memberships with recorded consent whose guest confirmed their email, at most 1000 per campaign, in the guest's language
+for the fixed texts. One campaign per business per 7 days. The sender name reads "{business} via BusinessAsk", the address is ours, replies go to the
+business's contact email. Every mail has an unsubscribe link and the `List-Unsubscribe` one-click headers that Gmail and Yahoo expect from bulk senders.
+The unsubscribe key is an HMAC of the membership id and the server secret: no login, nothing stored, and nobody can unsubscribe another guest.
+
+Sending runs inside the API process after the answer (five at a time). If the process restarts mid-send, the campaign stays "Sending" and the
+remaining guests get nothing; moving this to a queue (as TouristAsk does with Redis for translations) is the next step if volumes grow. Real
+sending is unverified: the sandbox cannot reach Brevo, and the sender domain must be verified in Brevo (SPF, DKIM, DMARC) before it works.

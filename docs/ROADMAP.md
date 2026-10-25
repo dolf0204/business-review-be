@@ -13,7 +13,7 @@ Production addresses: front end `https://businessask.eu`, API `https://api.busin
 4. **Reviews** (done): first visit asks for a Google review, then a Tripadvisor review; a click on the link (through our redirect) counts as left; "no thanks" asks again after 3 visits.
 5. **Loyalty card** (done): the business sets a period and a rule (for example 10 visits between 1 April and 3 April = free meal); the guest punches
    the card only when the browser location is near the business (needs HTTPS; a staff-code fallback for guests who block location); one punch per guest per day.
-6. **Offers**: the business publishes a special offer; registered guests who opted in get it by email (unsubscribe link in every mail).
+6. **Offers** (done): the business publishes a special offer; registered guests who opted in get it by email (unsubscribe link in every mail).
 7. **TouristAsk integration**: TouristAsk reads `GET /partners` (cached), shows the businesses under the guide and on the map, and the manual Sponsors screen is removed.
 8. **Billing** (decision pending): Stripe plans for businesses.
 
