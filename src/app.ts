@@ -10,6 +10,7 @@ import { authRoutes } from "./routes/auth.js";
 import { businessRoutes } from "./routes/businesses.js";
 import { guestRoutes } from "./routes/guests.js";
 import { reviewRoutes } from "./routes/reviews.js";
+import { operatorRoutes } from "./routes/operator.js";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { loyaltyRoutes } from "./routes/loyalty.js";
 import { postRoutes } from "./routes/posts.js";
@@ -82,6 +83,7 @@ export async function buildApp() {
   await app.register(reviewRoutes);
   await app.register(loyaltyRoutes);
   await app.register(campaignRoutes);
+  await app.register(operatorRoutes);
   await app.register(partnerRoutes);
   await app.register(publicRoutes);
   return app;

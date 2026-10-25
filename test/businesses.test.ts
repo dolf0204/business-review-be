@@ -2,7 +2,10 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   business: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn(), deleteMany: vi.fn() },
+  user: { findUnique: vi.fn() },
 }));
+const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
+vi.mock("../src/lib/mail.js", () => mail);
 vi.mock("../src/db.js", () => ({ prisma: db }));
 const places = vi.hoisted(() => ({ findPlaces: vi.fn(), placeDetails: vi.fn() }));
 vi.mock("../src/lib/googlePlaces.js", async (orig) => ({ ...(await orig<typeof import("../src/lib/googlePlaces.js")>()), ...places }));
@@ -14,7 +17,7 @@ const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({
   id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba", kind: "restaurant", subtitle: null, offerText: null, address: null, lat: null, lng: null,
   googlePlaceId: null, googleMapsUrl: null, googleReviewUrl: null, tripadvisorReviewUrl: null, websiteUrl: null, instagramUrl: null, facebookUrl: null,
-  phone: null, contactEmail: null, imageUrl: null, rating: null, ratingCount: null, theme: {}, publishedAt: null, ...over,
+  phone: null, contactEmail: null, imageUrl: null, rating: null, ratingCount: null, theme: {}, publishedAt: null, approvedAt: null, ...over,
 });
 
 async function call(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, payload?: object) {
@@ -99,6 +102,52 @@ describe("businesses", () => {
     const off = await call("POST", `/businesses/${ID}/unpublish`);
     expect(db.business.update.mock.calls.at(-1)![0].data.publishedAt).toBeNull();
     expect(off.statusCode).toBe(200);
+  });
+});
+
+describe("operator approval", () => {
+  const live = (over = {}) => row({ googlePlaceId: "ChIJabcdefghij123", lat: 44.1, lng: 15.2, ...over });
+  // The database answers with the row as it was plus what was changed.
+  const found = (r: ReturnType<typeof row>) => {
+    db.business.findFirst.mockResolvedValue(r);
+    db.business.update.mockImplementation(async ({ data }: { data: object }) => ({ ...r, ...data }));
+  };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mail.sendMail.mockResolvedValue(undefined);
+    db.user.findUnique.mockResolvedValue({ email: "owner@example.com" });
+  });
+
+  it("asks the operators to look at a business the first time it goes live", async () => {
+    found(live());
+    await call("POST", `/businesses/${ID}/publish`);
+    expect(mail.sendMail).toHaveBeenCalledTimes(2);
+    const sent = mail.sendMail.mock.calls[0]![0];
+    expect(sent.to).toBe("boss@example.com");
+    expect(sent.html).toContain(`/operator/review?b=${ID}&amp;k=`);
+    expect(sent.html).toContain("owner@example.com");
+  });
+
+  it("does not ask again for a business that is already live or already approved", async () => {
+    found(live({ publishedAt: new Date() }));
+    await call("POST", `/businesses/${ID}/publish`);
+    found(live({ approvedAt: new Date() }));
+    await call("POST", `/businesses/${ID}/publish`);
+    expect(mail.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("takes the approval back when an approved business changes what guests read, and asks again if it is live", async () => {
+    found(live({ approvedAt: new Date(), publishedAt: new Date(), offerText: "10% off" }));
+    await call("PATCH", `/businesses/${ID}`, { offerText: "Everything free" });
+    expect(db.business.update.mock.calls[0]![0].data.approvedAt).toBeNull();
+    expect(mail.sendMail.mock.calls[0]![0].subject).toContain("Changed");
+  });
+
+  it("keeps the approval for changes that do not touch what guests read, or an unchanged value", async () => {
+    found(live({ approvedAt: new Date(), publishedAt: new Date(), offerText: "10% off" }));
+    await call("PATCH", `/businesses/${ID}`, { phone: "023 1", offerText: "10% off" });
+    expect(db.business.update.mock.calls[0]![0].data.approvedAt).toBeUndefined();
+    expect(mail.sendMail).not.toHaveBeenCalled();
   });
 });
 

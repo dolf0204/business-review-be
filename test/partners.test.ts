@@ -39,6 +39,7 @@ describe("GET /partners", () => {
     expect(partners.map((p: { name: string }) => p.name)).toEqual(["Konoba Ribar", "Far"]);
     expect(partners[0].pageUrl).toBe("http://localhost:5190/b/abcd2345");
     expect(db.business.findMany.mock.calls[0]![0].where.publishedAt).toEqual({ not: null });
+    expect(db.business.findMany.mock.calls[0]![0].where.approvedAt).toEqual({ not: null });
   });
 
   it("leaves out businesses outside the radius and ones without a position", async () => {

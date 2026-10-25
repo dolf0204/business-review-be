@@ -10,6 +10,8 @@ const schema = z.object({
   JWT_SECRET: z.string().min(32),
   COOKIE_SECURE: z.stringbool().default(false),
   // Comma separated keys the TouristAsk backend sends as x-api-key to read GET /partners. Empty = the feed is closed.
+  // Comma separated emails of the people who approve businesses before TouristAsk shows them. Empty = nobody is notified.
+  OPERATOR_EMAILS: z.string().default(""),
   PARTNER_API_KEYS: z.string().default(""),
   // Server key for the Places API (New), used to look a business up from its Google Maps link.
   GOOGLE_PLACES_API_KEY: z.string().default(""),

@@ -13,6 +13,7 @@ export default defineConfig({
       MAIL_FROM_EMAIL: "test@example.com",
       PARTNER_API_KEYS: "partner-key-for-tests-0123456789abcdef",
       GOOGLE_PLACES_API_KEY: "places-key-for-tests",
+      OPERATOR_EMAILS: "boss@example.com, second@example.com",
     },
   },
 });

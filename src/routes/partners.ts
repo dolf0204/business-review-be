@@ -22,7 +22,7 @@ export function isPartnerKey(given: string | undefined): boolean {
 }
 
 /**
- * The feed TouristAsk reads to show sponsors: published businesses within a radius of a guide.
+ * The feed TouristAsk reads to show sponsors: published and approved businesses within a radius of a guide.
  * Server to server only: it needs a key from PARTNER_API_KEYS.
  */
 export async function partnerRoutes(app: FastifyInstance) {
@@ -45,6 +45,7 @@ export async function partnerRoutes(app: FastifyInstance) {
     const rows = await prisma.business.findMany({
       where: {
         publishedAt: { not: null },
+        approvedAt: { not: null },
         ...(kind ? { kind } : {}),
         lat: { gte: box.minLat, lte: box.maxLat },
         lng: { gte: box.minLng, lte: box.maxLng },

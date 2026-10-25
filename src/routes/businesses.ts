@@ -8,6 +8,7 @@ import { ownedBusiness } from "../lib/access.js";
 import { businessView, MAX_BUSINESSES_PER_OWNER, publishProblem } from "../lib/businessView.js";
 import { newCode, shareUrl } from "../lib/code.js";
 import { findPlaces, placeDetails, PlacesError } from "../lib/googlePlaces.js";
+import { requestApproval, REVIEWED_FIELDS } from "../lib/review.js";
 import { idParam, KINDS, profileSchema } from "../schemas.js";
 
 const placesStatus = (e: PlacesError) => (e.code === "google_unavailable" ? 503 : e.code === "place_not_found" ? 404 : 422);
@@ -46,7 +47,11 @@ export async function businessRoutes(app: FastifyInstance) {
     if (!b) return reply.code(404).send({ error: "not_found" });
     const { template, primary, accent, ...fields } = req.body;
     const theme = { ...(b.theme as Record<string, unknown>), ...(template ? { template } : {}), ...(primary ? { primary } : {}), ...(accent ? { accent } : {}) };
-    const updated = await prisma.business.update({ where: { id: b.id }, data: { ...fields, theme } });
+    // An approved business that changes what guests read has to be checked again.
+    const reviewedChange = REVIEWED_FIELDS.some((k) => k in fields && (fields as Record<string, unknown>)[k] !== b[k]);
+    const reopen = b.approvedAt !== null && reviewedChange;
+    const updated = await prisma.business.update({ where: { id: b.id }, data: { ...fields, theme, ...(reopen ? { approvedAt: null } : {}) } });
+    if (reopen && updated.publishedAt) await requestApproval(updated, true, req.log);
     return businessView(updated);
   });
 
@@ -60,7 +65,10 @@ export async function businessRoutes(app: FastifyInstance) {
     if (!b) return reply.code(404).send({ error: "not_found" });
     const problem = publishProblem(b);
     if (problem) return reply.code(422).send({ error: problem });
-    return businessView(await prisma.business.update({ where: { id: b.id }, data: { publishedAt: b.publishedAt ?? new Date() } }));
+    const updated = await prisma.business.update({ where: { id: b.id }, data: { publishedAt: b.publishedAt ?? new Date() } });
+    // The first time a business goes live (and is not yet approved), the operator is asked to look at it.
+    if (!b.publishedAt && !updated.approvedAt) await requestApproval(updated, false, req.log);
+    return businessView(updated);
   });
 
   r.post("/businesses/:id/unpublish", { ...auth, schema: { params: idParam } }, async (req, reply) => {
@@ -126,8 +134,11 @@ export async function businessRoutes(app: FastifyInstance) {
           // Contact details are only filled in when the owner has not written their own.
           websiteUrl: b.websiteUrl ?? p.websiteUrl,
           phone: b.phone ?? p.phone,
+          // A different Google place is a different business: check again.
+          ...(b.approvedAt !== null && b.googlePlaceId !== p.placeId ? { approvedAt: null } : {}),
         },
       });
+      if (b.approvedAt !== null && b.googlePlaceId !== p.placeId && updated.publishedAt) await requestApproval(updated, true, req.log);
       return businessView(updated);
     } catch (err) {
       if (err instanceof PlacesError) return reply.code(placesStatus(err)).send({ error: err.code });

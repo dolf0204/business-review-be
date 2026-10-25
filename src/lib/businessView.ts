@@ -5,7 +5,7 @@ export const MAX_BUSINESSES_PER_OWNER = 5;
 /** What the business admin receives: everything except the owner link. */
 export function businessView(b: Business) {
   const { ownerId: _owner, ...rest } = b;
-  return { ...rest, googleConnected: !!b.googlePlaceId, published: b.publishedAt !== null };
+  return { ...rest, googleConnected: !!b.googlePlaceId, published: b.publishedAt !== null, approved: b.approvedAt !== null };
 }
 
 /** A business can be shown to guests once it has a name and is connected to its Google page (that gives the position). */

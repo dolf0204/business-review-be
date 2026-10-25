@@ -66,6 +66,7 @@ All variables are validated in [`src/config.ts`](src/config.ts); a wrong value s
 | `DATABASE_URL` | PostgreSQL. |
 | `JWT_SECRET`, `COOKIE_SECURE` | Session cookie `session` (secret at least 32 characters). |
 | `PARTNER_API_KEYS` | Comma separated keys for `GET /partners`. Empty = the feed is closed. |
+| `OPERATOR_EMAILS` | Comma separated emails that get a mail with approve and reject buttons when a business goes live or changes. Only approved businesses are in `GET /partners`. |
 | `GOOGLE_PLACES_API_KEY` | Places API (New) server key. |
 | `TURNSTILE_SECRET` | Cloudflare Turnstile secret for the guest forms. |
 | `BREVO_API_KEY`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME` | Email. Empty key = emails are logged. |
@@ -108,6 +109,7 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Reviews (slice 4) | `POST /guest/b/:code/visit` (counts a visit once per day, answers what to ask: `google`, `tripadvisor` or nothing), `POST /guest/b/:code/review/:platform/decline`, `GET /r/:code/:platform` (counts the click, then redirects to the stored Google or Tripadvisor link), `GET /businesses/:id/stats` |
 | Loyalty (slice 5) | Owner: `GET/PUT /businesses/:id/loyalty` (program and today's staff code). Guest: `GET /guest/b/:code/loyalty`, `POST .../loyalty/punch` (location or staff code), `POST .../loyalty/redeem` (staff code). The rule is shown to everyone in `GET /public/b/:code`. |
 | Offers by email (slice 6) | Owner: `GET/POST /businesses/:id/campaigns` (send to guests who agreed; one a week; answers 202 and sends in the background), `POST /businesses/:id/campaigns/test` (preview to the owner's address). Public: `POST /public/unsubscribe`, `POST /public/unsubscribe/:m/:t` (one-click) |
+| Operator (slice 7) | Mail with a link to `/operator/review`; `GET /public/operator/review?b&k`, `POST /public/operator/decision` (approve or reject, the key in the link is the proof) |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -120,7 +122,7 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-100 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+111 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
 
 ## Guests and privacy (slice 3)
 
@@ -167,3 +169,10 @@ The unsubscribe key is an HMAC of the membership id and the server secret: no lo
 Sending runs inside the API process after the answer (five at a time). If the process restarts mid-send, the campaign stays "Sending" and the
 remaining guests get nothing; moving this to a queue (as TouristAsk does with Redis for translations) is the next step if volumes grow. Real
 sending is unverified: the sandbox cannot reach Brevo, and the sender domain must be verified in Brevo (SPF, DKIM, DMARC) before it works.
+
+## Approval before TouristAsk (slice 7)
+
+Anyone can connect a business to any Google place, because ownership is not proven. So a business reaches `GET /partners` only after an operator
+approved it: the first time it is published (and whenever an approved business changes its name, subtitle, offer or Google place) the operators in
+`OPERATOR_EMAILS` get a mail with the details and a link to a page with Approve and Reject. The key in the link (an HMAC of the business id) is the proof; there
+is no operator login. Approval does not affect the business's own page or its loyalty card, only the sponsor listing in TouristAsk.

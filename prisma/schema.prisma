@@ -75,6 +75,9 @@ model Business {
   theme         Json      @default("{}")
   // Only published businesses are visible to guests and to TouristAsk.
   publishedAt   DateTime?
+  // The operator has checked the page. Only approved businesses are given to TouristAsk as sponsors. Changing the name, offer or
+  // Google place of an approved business clears this until it is checked again.
+  approvedAt    DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
