@@ -105,6 +105,7 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Guest page | `GET /public/b/:code` (published businesses only, no owner or account data, cached 60 s) |
 | Guests (slice 3) | `POST /public/b/:code/join` (email link, Turnstile, 5 links per hour per address), `POST /guest/verify`, `GET/PATCH /guest/me`, `POST /guest/logout`, `POST /guest/b/:code/join` (signed-in guest joins another business), `PUT /guest/b/:code/marketing` (give or withdraw consent for offers by email) |
 | News (slice 3) | `GET/POST /businesses/:id/posts`, `DELETE /posts/:id` (max 20 per business); the latest 5 live posts are part of `GET /public/b/:code` |
+| Reviews (slice 4) | `POST /guest/b/:code/visit` (counts a visit once per day, answers what to ask: `google`, `tripadvisor` or nothing), `POST /guest/b/:code/review/:platform/decline`, `GET /r/:code/:platform` (counts the click, then redirects to the stored Google or Tripadvisor link), `GET /businesses/:id/stats` |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -117,7 +118,7 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-57 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+71 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
 
 ## Guests and privacy (slice 3)
 
@@ -130,3 +131,10 @@ with `PUT /guest/b/:code/marketing`. Google review prompts do not need our own G
 we only count the click.
 
 Still to do before launch: privacy policy and terms for guests, a delete-my-data action, and an unsubscribe link in every offers email.
+
+## Review prompts (slice 4)
+
+Rules live in `src/lib/reviews.ts` and are tested: Google is asked first and Tripadvisor only after the Google link was followed; a guest who
+declines Google is not pushed on to Tripadvisor; "no thanks" is asked again after 3 more visits (a visit is one calendar day, UTC, on which
+the guest opened the page); following a link finishes that platform for good. We can only know the link was followed, not that a review
+was posted. The redirect target comes only from the business's stored links, so `/r/...` cannot be used as an open redirect.
