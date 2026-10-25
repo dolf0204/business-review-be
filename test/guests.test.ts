@@ -156,6 +156,17 @@ describe("a signed-in guest", () => {
     expect((await call("PUT", "/guest/b/abcd2345/marketing", { optIn: true }, `guest=${await guestCookie()}`)).statusCode).toBe(404);
   });
 
+  it("joins another business with one tap, only if it is published", async () => {
+    db.business.findUnique.mockResolvedValue({ id: "b2", publishedAt: new Date() });
+    const ok = await call("POST", "/guest/b/abcd2345/join", { marketingOptIn: true }, `guest=${await guestCookie()}`);
+    expect(ok.statusCode).toBe(200);
+    expect(db.membership.upsert.mock.calls[0]![0].create).toMatchObject({ guestId: "g1", businessId: "b2" });
+    expect(db.membership.upsert.mock.calls[0]![0].create.marketingOptInAt).toBeInstanceOf(Date);
+    db.business.findUnique.mockResolvedValue({ id: "b2", publishedAt: null });
+    expect((await call("POST", "/guest/b/abcd2345/join", {}, `guest=${await guestCookie()}`)).statusCode).toBe(404);
+    expect((await call("POST", "/guest/b/abcd2345/join", {})).statusCode).toBe(401);
+  });
+
   it("signs out by clearing the cookie", async () => {
     expect(String((await call("POST", "/guest/logout")).headers["set-cookie"])).toMatch(/guest=;/);
   });

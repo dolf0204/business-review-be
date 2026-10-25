@@ -107,6 +107,20 @@ export async function guestRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
+  // A guest who is already signed in joins another business with one tap: the address was proven when they signed in.
+  r.post("/guest/b/:code/join", { preHandler: needGuest, schema: { params: z.object({ code }), body: z.object({ marketingOptIn: z.boolean().default(false) }).default({ marketingOptIn: false }) } }, async (req, reply) => {
+    const g = guestFrom(req);
+    const business = await prisma.business.findUnique({ where: { code: req.params.code }, select: { id: true, publishedAt: true } });
+    if (!business || !business.publishedAt) return reply.code(404).send({ error: "not_found" });
+    const now = new Date();
+    await prisma.membership.upsert({
+      where: { guestId_businessId: { guestId: g.id, businessId: business.id } },
+      create: { guestId: g.id, businessId: business.id, marketingOptInAt: req.body.marketingOptIn ? now : null },
+      update: req.body.marketingOptIn ? { marketingOptInAt: now } : {},
+    });
+    return { ok: true };
+  });
+
   // Agree to, or stop, a business's offers by email.
   r.put("/guest/b/:code/marketing", { preHandler: needGuest, schema: { params: z.object({ code }), body: z.object({ optIn: z.boolean() }) } }, async (req, reply) => {
     const g = guestFrom(req);
