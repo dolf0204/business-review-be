@@ -1,0 +1,53 @@
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const db = vi.hoisted(() => ({ business: { findMany: vi.fn() } }));
+vi.mock("../src/db.js", () => ({ prisma: db }));
+
+import { buildApp } from "../src/app.js";
+
+const KEY = "partner-key-for-tests-0123456789abcdef";
+const biz = (over = {}) => ({
+  id: "11111111-1111-4111-8111-111111111111", code: "abcd2345", name: "Konoba Ribar", kind: "restaurant", subtitle: "Best fish", offerText: "10% off",
+  address: "Obala 1, Zadar", lat: 44.12, lng: 15.23, imageUrl: null, rating: 4.7, ratingCount: 300, websiteUrl: null,
+  googleMapsUrl: null, googleReviewUrl: null, ...over,
+});
+
+async function get(query: string, headers: Record<string, string> = { "x-api-key": KEY }) {
+  const app = await buildApp();
+  const res = await app.inject({ url: `/partners?${query}`, headers });
+  await app.close();
+  return res;
+}
+
+describe("GET /partners", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.business.findMany.mockResolvedValue([biz()]);
+  });
+
+  it("is closed without a valid key", async () => {
+    expect((await get("lat=44.1&lng=15.2", {})).statusCode).toBe(401);
+    expect((await get("lat=44.1&lng=15.2", { "x-api-key": "wrong" })).statusCode).toBe(401);
+    expect(db.business.findMany).not.toHaveBeenCalled();
+  });
+
+  it("returns published businesses near the point, nearest first, with their page link", async () => {
+    db.business.findMany.mockResolvedValue([biz({ id: "far", name: "Far", lat: 44.3, lng: 15.4 }), biz()]);
+    const res = await get("lat=44.1194&lng=15.2314&radiusKm=30");
+    expect(res.statusCode).toBe(200);
+    const { partners } = res.json();
+    expect(partners.map((p: { name: string }) => p.name)).toEqual(["Konoba Ribar", "Far"]);
+    expect(partners[0].pageUrl).toBe("http://localhost:5190/b/abcd2345");
+    expect(db.business.findMany.mock.calls[0]![0].where.publishedAt).toEqual({ not: null });
+  });
+
+  it("leaves out businesses outside the radius and ones without a position", async () => {
+    db.business.findMany.mockResolvedValue([biz({ lat: 43.5, lng: 16.44 }), biz({ lat: null, lng: null })]);
+    expect((await get("lat=44.1194&lng=15.2314")).json().partners).toEqual([]);
+  });
+
+  it("refuses a radius above 50 km and a position that is not on the earth", async () => {
+    expect((await get("lat=44&lng=15&radiusKm=500")).statusCode).toBe(400);
+    expect((await get("lat=144&lng=15")).statusCode).toBe(400);
+  });
+});

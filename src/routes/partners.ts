@@ -1,0 +1,80 @@
+import { timingSafeEqual } from "node:crypto";
+import type { FastifyInstance } from "fastify";
+import type { ZodTypeProvider } from "fastify-type-provider-zod";
+import { z } from "zod";
+import { config } from "../config.js";
+import { prisma } from "../db.js";
+import { boundingBox, distanceKm } from "../lib/geo.js";
+
+const MAX_RADIUS_KM = 50;
+const DEFAULT_RADIUS_KM = 25;
+const MAX_RESULTS = 500;
+
+const keys = () => config.PARTNER_API_KEYS.split(",").map((k) => k.trim()).filter(Boolean);
+
+export function isPartnerKey(given: string | undefined): boolean {
+  if (!given) return false;
+  const g = Buffer.from(given);
+  return keys().some((k) => {
+    const b = Buffer.from(k);
+    return b.length === g.length && timingSafeEqual(b, g);
+  });
+}
+
+/**
+ * The feed TouristAsk reads to show sponsors: published businesses within a radius of a guide.
+ * Server to server only: it needs a key from PARTNER_API_KEYS.
+ */
+export async function partnerRoutes(app: FastifyInstance) {
+  const r = app.withTypeProvider<ZodTypeProvider>();
+
+  r.get("/partners", {
+    schema: {
+      querystring: z.object({
+        lat: z.coerce.number().min(-90).max(90),
+        lng: z.coerce.number().min(-180).max(180),
+        radiusKm: z.coerce.number().min(1).max(MAX_RADIUS_KM).default(DEFAULT_RADIUS_KM),
+        kind: z.string().max(20).optional(),
+      }),
+    },
+    config: { rateLimit: { max: 120, timeWindow: "1 minute" } },
+  }, async (req, reply) => {
+    if (!isPartnerKey(req.headers["x-api-key"] as string | undefined)) return reply.code(401).send({ error: "unauthorized" });
+    const { lat, lng, radiusKm, kind } = req.query;
+    const box = boundingBox({ lat, lng }, radiusKm);
+    const rows = await prisma.business.findMany({
+      where: {
+        publishedAt: { not: null },
+        ...(kind ? { kind } : {}),
+        lat: { gte: box.minLat, lte: box.maxLat },
+        lng: { gte: box.minLng, lte: box.maxLng },
+      },
+      take: MAX_RESULTS,
+    });
+    const partners = rows
+      .flatMap((b) => (b.lat === null || b.lng === null ? [] : [{ b, km: distanceKm({ lat, lng }, { lat: b.lat, lng: b.lng }) }]))
+      .filter((x) => x.km <= radiusKm)
+      .sort((a, c) => a.km - c.km)
+      .map(({ b, km }) => ({
+        id: b.id,
+        code: b.code,
+        name: b.name,
+        kind: b.kind,
+        tagline: b.subtitle,
+        offerText: b.offerText,
+        address: b.address,
+        lat: b.lat,
+        lng: b.lng,
+        distanceKm: Math.round(km * 10) / 10,
+        imageUrl: b.imageUrl,
+        rating: b.rating,
+        ratingCount: b.ratingCount,
+        websiteUrl: b.websiteUrl,
+        googleMapsUrl: b.googleMapsUrl,
+        googleReviewUrl: b.googleReviewUrl,
+        pageUrl: `${config.APP_URL}/b/${b.code}`,
+      }));
+    reply.header("cache-control", "no-store");
+    return { partners };
+  });
+}

@@ -1,0 +1,62 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// A business owner (restaurant, cafe, bar, barber ...). Signs in to the business admin.
+model User {
+  id              String     @id @default(uuid()) @db.Uuid
+  email           String     @unique
+  passwordHash    String?
+  name            String?
+  uiLang          String     @default("en")
+  emailVerifiedAt DateTime?
+  createdAt       DateTime   @default(now())
+  updatedAt       DateTime   @updatedAt
+
+  businesses      Business[]
+}
+
+// One venue. This table is the source of truth for sponsors: TouristAsk reads it through GET /partners.
+model Business {
+  id            String    @id @default(uuid()) @db.Uuid
+  ownerId       String    @db.Uuid
+  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  // Stable short code printed in the QR code and written on the NFC tag. Never changes.
+  code          String    @unique
+  name          String
+  // The business kind, same values as TouristAsk sponsors: restaurant, cafe, bar, beauty, shop, sport, sight, beach, other.
+  kind          String    @default("restaurant")
+  subtitle      String?
+  // The headline offer shown to TouristAsk guests, for example "10% off for our guests".
+  offerText     String?
+  address       String?
+  lat           Float?
+  lng           Float?
+  googlePlaceId String?
+  googleMapsUrl String?
+  // Where guests are sent to review. Clicking counts as a review left.
+  googleReviewUrl      String?
+  tripadvisorReviewUrl String?
+  websiteUrl    String?
+  instagramUrl  String?
+  facebookUrl   String?
+  phone         String?
+  contactEmail  String?
+  imageUrl      String?
+  // Latest Google rating copied when the business is connected, shown on its card.
+  rating        Float?
+  ratingCount   Int?
+  theme         Json      @default("{}")
+  // Only published businesses are visible to guests and to TouristAsk.
+  publishedAt   DateTime?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([ownerId])
+  @@index([lat, lng])
+}
