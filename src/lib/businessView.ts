@@ -18,7 +18,9 @@ export function publishProblem(b: Pick<Business, "name" | "googlePlaceId" | "lat
 const DEFAULT_THEME = { template: "classic", primary: "#0f766e", accent: "#f97316" };
 
 /** What a guest receives about a published business: the page content, nothing about the owner or the account. */
-export function publicBusiness(b: Business, posts: { id: string; title: string; body: string | null; endsAt: Date | null; createdAt: Date }[] = []) {
+type LoyaltyTeaser = { enabled: boolean; goal: number; rewardText: string; startsAt: Date | null; endsAt: Date | null } | null;
+
+export function publicBusiness(b: Business, posts: { id: string; title: string; body: string | null; endsAt: Date | null; createdAt: Date }[] = [], loyalty: LoyaltyTeaser = null) {
   const theme = { ...DEFAULT_THEME, ...(b.theme as Record<string, string>) };
   return {
     code: b.code,
@@ -38,6 +40,7 @@ export function publicBusiness(b: Business, posts: { id: string; title: string; 
     phone: b.phone,
     contactEmail: b.contactEmail,
     theme: { template: theme.template, primary: theme.primary, accent: theme.accent },
+    loyalty: loyalty?.enabled ? { goal: loyalty.goal, rewardText: loyalty.rewardText, startsAt: loyalty.startsAt, endsAt: loyalty.endsAt } : null,
     posts: posts.map((p) => ({ id: p.id, title: p.title, body: p.body, endsAt: p.endsAt, createdAt: p.createdAt })),
   };
 }

@@ -79,6 +79,7 @@ model Business {
   updatedAt     DateTime  @updatedAt
 
   posts         Post[]
+  loyaltyProgram LoyaltyProgram?
   memberships   Membership[]
   guestTokens   GuestToken[]
 
@@ -134,6 +135,8 @@ model Membership {
   lastVisitAt      DateTime?
 
   reviewPrompts    ReviewPrompt[]
+  loyaltyCards     LoyaltyCard[]
+  loyaltyPunches   LoyaltyPunch[]
 
   @@unique([guestId, businessId])
   @@index([businessId])
@@ -177,4 +180,59 @@ model Post {
   business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, createdAt])
+}
+
+enum LoyaltyMethod {
+  LOCATION   // the guest's phone was near the business
+  STAFF_CODE // the guest typed the code staff showed them
+}
+
+// The business's loyalty offer: collect `goal` visits, get the reward. One program per business.
+model LoyaltyProgram {
+  id           String    @id @default(uuid()) @db.Uuid
+  businessId   String    @unique @db.Uuid
+  enabled      Boolean   @default(false)
+  goal         Int       @default(10)
+  rewardText   String
+  // Punches only count inside this window. Null means no limit on that side.
+  startsAt     DateTime?
+  endsAt       DateTime?
+  // How close the guest's phone must be to the business.
+  radiusMeters Int       @default(150)
+  updatedAt    DateTime  @updatedAt
+
+  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+// One card of one guest. Goal and reward are copied when the card starts, so changing the program never changes a card in progress.
+model LoyaltyCard {
+  id           String    @id @default(uuid()) @db.Uuid
+  membershipId String    @db.Uuid
+  goal         Int
+  rewardText   String
+  completedAt  DateTime?
+  redeemedAt   DateTime?
+  createdAt    DateTime  @default(now())
+
+  membership   Membership    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  punches      LoyaltyPunch[]
+
+  @@index([membershipId, createdAt])
+}
+
+// One stamp. The unique (membership, day) is what makes "one per day" true even if the button is tapped twice at once.
+model LoyaltyPunch {
+  id             String        @id @default(uuid()) @db.Uuid
+  cardId         String        @db.Uuid
+  membershipId   String        @db.Uuid
+  day            String
+  method         LoyaltyMethod
+  distanceMeters Int?
+  createdAt      DateTime      @default(now())
+
+  card           LoyaltyCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  membership     Membership    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, day])
+  @@index([cardId])
 }

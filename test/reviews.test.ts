@@ -5,6 +5,8 @@ const db = vi.hoisted(() => ({
   guest: { findUnique: vi.fn() },
   membership: { findUnique: vi.fn(), update: vi.fn(), count: vi.fn(), aggregate: vi.fn() },
   reviewPrompt: { upsert: vi.fn(), count: vi.fn() },
+  loyaltyPunch: { count: vi.fn() },
+  loyaltyCard: { count: vi.fn() },
 }));
 vi.mock("../src/db.js", () => ({ prisma: db }));
 
@@ -144,11 +146,13 @@ describe("numbers for the owner", () => {
     db.membership.count.mockResolvedValueOnce(12).mockResolvedValueOnce(5);
     db.membership.aggregate.mockResolvedValue({ _sum: { visits: 40 } });
     db.reviewPrompt.count.mockResolvedValueOnce(7).mockResolvedValueOnce(3);
+    db.loyaltyPunch.count.mockResolvedValue(25);
+    db.loyaltyCard.count.mockResolvedValue(2);
     const app = await buildApp();
     const cookie = `session=${app.jwt.sign({ sub: "u1" })}`;
     const id = "11111111-1111-4111-8111-111111111111";
     const res = await app.inject({ url: `/businesses/${id}/stats`, headers: { cookie } });
-    expect(res.json()).toEqual({ members: 12, offersOptIn: 5, visits: 40, googleReviewClicks: 7, tripadvisorReviewClicks: 3 });
+    expect(res.json()).toEqual({ members: 12, offersOptIn: 5, visits: 40, googleReviewClicks: 7, tripadvisorReviewClicks: 3, stamps: 25, rewardsRedeemed: 2 });
     db.business.findFirst.mockResolvedValue(null);
     expect((await app.inject({ url: `/businesses/${id}/stats`, headers: { cookie } })).statusCode).toBe(404);
     await app.close();
