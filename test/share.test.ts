@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const db = vi.hoisted(() => ({ business: { findFirst: vi.fn(), findUnique: vi.fn() } }));
+const db = vi.hoisted(() => ({ business: { findFirst: vi.fn(), findUnique: vi.fn() }, post: { findMany: vi.fn() } }));
 vi.mock("../src/db.js", () => ({ prisma: db }));
 
 import { buildApp } from "../src/app.js";
@@ -25,6 +25,7 @@ describe("QR code and NFC address", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     db.business.findFirst.mockResolvedValue(row());
+    db.post.findMany.mockResolvedValue([]);
   });
 
   it("builds a stable address with a hint of how it was opened", () => {
@@ -60,6 +61,7 @@ describe("QR code and NFC address", () => {
 });
 
 describe("the guest page data", () => {
+  beforeEach(() => db.post.findMany.mockResolvedValue([]));
   const get = async (code = "abcd2345") => {
     const app = await buildApp();
     const res = await app.inject({ url: `/public/b/${code}` });

@@ -78,6 +78,72 @@ model Business {
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
+  posts         Post[]
+  memberships   Membership[]
+  guestTokens   GuestToken[]
+
   @@index([ownerId])
   @@index([lat, lng])
+}
+
+// A visitor who joined a business by email. One account for all businesses, so the same person is recognised everywhere.
+model Guest {
+  id              String       @id @default(uuid()) @db.Uuid
+  email           String       @unique
+  name            String?
+  lang            String       @default("en")
+  emailVerifiedAt DateTime?
+  createdAt       DateTime     @default(now())
+
+  tokens          GuestToken[]
+  memberships     Membership[]
+}
+
+// The one-time sign-in link emailed to a guest. Only a hash is stored. It remembers which business the guest came from.
+model GuestToken {
+  id           String   @id @default(uuid()) @db.Uuid
+  guestId      String   @db.Uuid
+  businessId   String   @db.Uuid
+  tokenHash    String   @unique
+  // The consent the guest ticked on the form; it is recorded only once the link is opened (the address is then proven).
+  marketingOptIn Boolean @default(false)
+  expiresAt    DateTime
+  usedAt       DateTime?
+  createdAt    DateTime @default(now())
+
+  guest        Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([guestId, createdAt])
+}
+
+// A guest's relationship with one business. The loyalty card and the visit count will hang on this.
+model Membership {
+  id               String    @id @default(uuid()) @db.Uuid
+  guestId          String    @db.Uuid
+  businessId       String    @db.Uuid
+  joinedAt         DateTime  @default(now())
+  // Consent to receive this business's offers by email. Null means no consent (or withdrawn).
+  marketingOptInAt DateTime?
+
+  guest            Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@unique([guestId, businessId])
+  @@index([businessId])
+}
+
+// News shown on the business page: a special offer or an announcement.
+model Post {
+  id         String    @id @default(uuid()) @db.Uuid
+  businessId String    @db.Uuid
+  title      String
+  body       String?
+  // After this moment the post is no longer shown. Null means until the business removes it.
+  endsAt     DateTime?
+  createdAt  DateTime  @default(now())
+
+  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
 }

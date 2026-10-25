@@ -8,6 +8,8 @@ import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod
 import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { businessRoutes } from "./routes/businesses.js";
+import { guestRoutes } from "./routes/guests.js";
+import { postRoutes } from "./routes/posts.js";
 import { healthRoutes } from "./routes/health.js";
 import { publicRoutes } from "./routes/public.js";
 import { partnerRoutes } from "./routes/partners.js";
@@ -19,8 +21,9 @@ declare module "fastify" {
 }
 declare module "@fastify/jwt" {
   interface FastifyJWT {
-    payload: { sub: string };
-    user: { sub: string };
+    // kind is "guest" only for a guest's session, which must never open the owner's screens.
+    payload: { sub: string; kind?: "guest" };
+    user: { sub: string; kind?: "guest" };
   }
 }
 
@@ -62,6 +65,7 @@ export async function buildApp() {
   app.decorate("authenticate", async (req, reply) => {
     try {
       await req.jwtVerify({ onlyCookie: true });
+      if (req.user.kind === "guest") throw new Error("guest token");
     } catch {
       reply.code(401).send({ error: "unauthenticated" });
     }
@@ -70,6 +74,8 @@ export async function buildApp() {
   await app.register(healthRoutes);
   await app.register(authRoutes);
   await app.register(businessRoutes);
+  await app.register(postRoutes);
+  await app.register(guestRoutes);
   await app.register(partnerRoutes);
   await app.register(publicRoutes);
   return app;
