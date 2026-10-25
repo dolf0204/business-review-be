@@ -1,7 +1,16 @@
 import { config } from "../config.js";
 
 export type Attachment = { name: string; content: Buffer };
-export type Mail = { to: string; subject: string; html: string; attachments?: Attachment[] };
+export type Mail = {
+  to: string;
+  subject: string;
+  html: string;
+  attachments?: Attachment[];
+  // Shown as the sender's name, for example "Konoba Ribar via BusinessAsk". The address stays ours.
+  fromName?: string;
+  replyTo?: string;
+  headers?: Record<string, string>;
+};
 
 export async function sendMail(mail: Mail, log: { info: (o: object, m: string) => void }) {
   if (!config.BREVO_API_KEY) {
@@ -12,7 +21,9 @@ export async function sendMail(mail: Mail, log: { info: (o: object, m: string) =
     method: "POST",
     headers: { "api-key": config.BREVO_API_KEY, "content-type": "application/json", accept: "application/json" },
     body: JSON.stringify({
-      sender: { email: config.MAIL_FROM_EMAIL, name: config.MAIL_FROM_NAME },
+      sender: { email: config.MAIL_FROM_EMAIL, name: mail.fromName ?? config.MAIL_FROM_NAME },
+      ...(mail.replyTo ? { replyTo: { email: mail.replyTo } } : {}),
+      ...(mail.headers ? { headers: mail.headers } : {}),
       to: [{ email: mail.to }],
       subject: mail.subject,
       htmlContent: mail.html,

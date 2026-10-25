@@ -80,6 +80,7 @@ model Business {
 
   posts         Post[]
   loyaltyProgram LoyaltyProgram?
+  campaigns     Campaign[]
   memberships   Membership[]
   guestTokens   GuestToken[]
 
@@ -235,4 +236,27 @@ model LoyaltyPunch {
 
   @@unique([membershipId, day])
   @@index([cardId])
+}
+
+enum CampaignStatus {
+  SENDING
+  SENT
+}
+
+// A special offer the business emailed to the guests who agreed to receive offers.
+model Campaign {
+  id          String         @id @default(uuid()) @db.Uuid
+  businessId  String         @db.Uuid
+  subject     String
+  body        String
+  status      CampaignStatus @default(SENDING)
+  recipients  Int
+  sentCount   Int            @default(0)
+  failedCount Int            @default(0)
+  createdAt   DateTime       @default(now())
+  finishedAt  DateTime?
+
+  business    Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
 }
