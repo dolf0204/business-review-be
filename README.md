@@ -103,6 +103,8 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Google | `POST /google/lookup` (pasted Google Maps link or typed name and town, up to 3 candidates), `PUT /businesses/:id/google` (confirm the place; position, address, rating, review link are read from Google, never from the browser) |
 | Share (slice 2) | `GET /businesses/:id/share` (the QR and NFC addresses, `/b/<code>?s=q` and `?s=n`), `GET /businesses/:id/qr?format=svg\|png&size=200..2000` |
 | Guest page | `GET /public/b/:code` (published businesses only, no owner or account data, cached 60 s) |
+| Guests (slice 3) | `POST /public/b/:code/join` (email link, Turnstile, 5 links per hour per address), `POST /guest/verify`, `GET/PATCH /guest/me`, `POST /guest/logout`, `POST /guest/b/:code/join` (signed-in guest joins another business), `PUT /guest/b/:code/marketing` (give or withdraw consent for offers by email) |
+| News (slice 3) | `GET/POST /businesses/:id/posts`, `DELETE /posts/:id` (max 20 per business); the latest 5 live posts are part of `GET /public/b/:code` |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -115,4 +117,16 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-41 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+57 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+
+## Guests and privacy (slice 3)
+
+A guest is one account per email address, shared by all businesses, so the same person is recognised everywhere. There is no password:
+the guest gets a link (valid 30 minutes, single use, only a hash is stored) and the session is a long-lived HTTP-only cookie `guest`
+(180 days, separate from the owner's `session` cookie, and it can never open an owner screen). On a new phone the guest asks for a new link.
+This identity is what the loyalty card (slice 5) and the offers email (slice 6) hang on: a `Membership` links a guest to a business and
+records consent for that business's offers. Consent is recorded only after the link is opened, it is per business, and it is withdrawn
+with `PUT /guest/b/:code/marketing`. Google review prompts do not need our own Google sign-in: the review itself happens on Google's site and
+we only count the click.
+
+Still to do before launch: privacy policy and terms for guests, a delete-my-data action, and an unsubscribe link in every offers email.
