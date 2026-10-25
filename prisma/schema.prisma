@@ -7,6 +7,11 @@ datasource db {
   provider = "postgresql"
 }
 
+enum TokenKind {
+  VERIFY_EMAIL
+  RESET_PASSWORD
+}
+
 // A business owner (restaurant, cafe, bar, barber ...). Signs in to the business admin.
 model User {
   id              String     @id @default(uuid()) @db.Uuid
@@ -19,6 +24,22 @@ model User {
   updatedAt       DateTime   @updatedAt
 
   businesses      Business[]
+  tokens          AuthToken[]
+}
+
+// One-time links sent by email (confirm the address, reset the password). Only a hash is stored.
+model AuthToken {
+  id        String    @id @default(uuid()) @db.Uuid
+  userId    String    @db.Uuid
+  kind      TokenKind
+  tokenHash String    @unique
+  expiresAt DateTime
+  usedAt    DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, kind])
 }
 
 // One venue. This table is the source of truth for sponsors: TouristAsk reads it through GET /partners.

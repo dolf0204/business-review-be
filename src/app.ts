@@ -6,6 +6,8 @@ import rateLimit from "@fastify/rate-limit";
 import Fastify from "fastify";
 import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod";
 import { config } from "./config.js";
+import { authRoutes } from "./routes/auth.js";
+import { businessRoutes } from "./routes/businesses.js";
 import { healthRoutes } from "./routes/health.js";
 import { partnerRoutes } from "./routes/partners.js";
 
@@ -65,6 +67,8 @@ export async function buildApp() {
   });
 
   await app.register(healthRoutes);
+  await app.register(authRoutes);
+  await app.register(businessRoutes);
   await app.register(partnerRoutes);
   return app;
 }

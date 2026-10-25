@@ -12,6 +12,7 @@ export default defineConfig({
       JWT_SECRET: "test-secret-test-secret-test-secret-123456",
       MAIL_FROM_EMAIL: "test@example.com",
       PARTNER_API_KEYS: "partner-key-for-tests-0123456789abcdef",
+      GOOGLE_PLACES_API_KEY: "places-key-for-tests",
     },
   },
 });

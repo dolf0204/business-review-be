@@ -3,7 +3,9 @@
 Built in small slices, each tested and merged before the next one.
 
 0. **Set up** (done): skeleton, schema, `GET /partners`.
-1. **Business account**: sign up with email (verification, password reset), sign in, business profile (name, kind, subtitle and
+
+Production addresses: front end `https://businessask.eu`, API `https://api.businessask.eu`, sender `no-reply@businessask.eu`.
+1. **Business account** (done; see below for what is not verified): sign up with email (verification, password reset), sign in, business profile (name, kind, subtitle and
    offer, address and map position from the Google Maps link, footer with website, social links and contacts, image, design template),
    publish and unpublish.
 2. **QR and NFC**: stable code per business, QR image (SVG, PNG), a printable sign, the link to write on an NFC tag, the guest landing page `/b/<code>`.

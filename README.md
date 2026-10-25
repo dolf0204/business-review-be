@@ -91,7 +91,26 @@ route, thin routes with the rules in `src/lib`, errors as `{ error: "snake_case"
 `404 not_found`, the server decides everything that matters (the browser never sends prices, limits or distances), comments
 say why. Every rule gets a test.
 
+## API (slice 1)
+
+Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 not_found`.
+
+| Area | Endpoints |
+| --- | --- |
+| Health | `GET /health` |
+| Auth | `POST /auth/register`, `/auth/verify-email`, `/auth/resend-verification`, `/auth/login`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`; `GET /auth/me` |
+| Businesses | `GET/POST /businesses`, `GET/PATCH/DELETE /businesses/:id`, `POST /businesses/:id/publish`, `/unpublish` (max 5 per owner) |
+| Google | `POST /google/lookup` (pasted Google Maps link or typed name and town, up to 3 candidates), `PUT /businesses/:id/google` (confirm the place; position, address, rating, review link are read from Google, never from the browser) |
+| Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
+
+Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
+100 characters), website, Instagram and Facebook links (only those sites are accepted), Tripadvisor review link, phone, contact email,
+and a design (template and two colors).
+
+**Known gap:** anyone can connect to any Google place, because ownership is not proven yet (that needs the Google Business Profile
+API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need either an operator approval step or that API.
+
 ## Status
 
-Set up: project skeleton, config, database schema (User, Business), `GET /partners` with tests. Nothing else is built
-yet, see the roadmap. Not verified: anything against a real database, Google, Brevo or Turnstile.
+Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
+35 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).

@@ -17,7 +17,7 @@ const schema = z.object({
   TURNSTILE_SECRET: z.string().default(""),
   BREVO_API_KEY: z.string().default(""),
   MAIL_FROM_EMAIL: z.email(),
-  MAIL_FROM_NAME: z.string().default("Business Review"),
+  MAIL_FROM_NAME: z.string().default("BusinessAsk"),
 });
 
 export const config = schema.parse(process.env);
