@@ -18,7 +18,7 @@ const lang = z.enum(UI_LANGS);
 const code = z.string().min(4).max(32);
 
 /** The guest behind this request, from the long-lived `guest` cookie. A session of any other kind never counts. */
-async function guestOf(app: FastifyInstance, req: FastifyRequest) {
+export async function guestOf(app: FastifyInstance, req: FastifyRequest) {
   const raw = req.cookies.guest;
   if (!raw) return null;
   try {

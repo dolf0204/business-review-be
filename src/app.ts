@@ -9,6 +9,7 @@ import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { businessRoutes } from "./routes/businesses.js";
 import { guestRoutes } from "./routes/guests.js";
+import { reviewRoutes } from "./routes/reviews.js";
 import { postRoutes } from "./routes/posts.js";
 import { healthRoutes } from "./routes/health.js";
 import { publicRoutes } from "./routes/public.js";
@@ -76,6 +77,7 @@ export async function buildApp() {
   await app.register(businessRoutes);
   await app.register(postRoutes);
   await app.register(guestRoutes);
+  await app.register(reviewRoutes);
   await app.register(partnerRoutes);
   await app.register(publicRoutes);
   return app;

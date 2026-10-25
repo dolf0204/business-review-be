@@ -129,8 +129,39 @@ model Membership {
   guest            Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
   business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
+  // Days on which the guest opened the page (one count per day). Review prompts and the loyalty card build on this.
+  visits           Int       @default(0)
+  lastVisitAt      DateTime?
+
+  reviewPrompts    ReviewPrompt[]
+
   @@unique([guestId, businessId])
   @@index([businessId])
+}
+
+enum ReviewPlatform {
+  GOOGLE
+  TRIPADVISOR
+}
+
+enum ReviewPromptStatus {
+  DONE     // the guest followed the review link
+  DECLINED // the guest said no thanks; we ask again after a few more visits
+}
+
+// What happened when a guest was asked for a review on one platform.
+model ReviewPrompt {
+  id              String             @id @default(uuid()) @db.Uuid
+  membershipId    String             @db.Uuid
+  platform        ReviewPlatform
+  status          ReviewPromptStatus
+  // The guest's visit count when they said no thanks.
+  declinedAtVisit Int                @default(0)
+  updatedAt       DateTime           @updatedAt
+
+  membership      Membership         @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([membershipId, platform])
 }
 
 // News shown on the business page: a special offer or an announcement.
