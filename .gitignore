@@ -8,3 +8,5 @@ src/generated
 keys
 *.pem
 *.log
+deploy/*.env
+deploy/backups

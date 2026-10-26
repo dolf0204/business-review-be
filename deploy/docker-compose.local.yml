@@ -1,0 +1,6 @@
+# Runs the whole stack on your own computer at http://localhost (same ports as development).
+services:
+  web:
+    ports:
+      - "8090:8090"   # API
+      - "5190:5190"   # app: business admin and guest pages

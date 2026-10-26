@@ -1,0 +1,9 @@
+# Server deployment: HTTPS on ports 80 and 443 with automatic certificates.
+services:
+  web:
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./caddy/root.caddy:/etc/caddy/extra/root.caddy:ro

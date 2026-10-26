@@ -1,0 +1,19 @@
+# Builds the front end (business admin and guest pages are one app) and serves it, with the API proxy, from one Caddy image.
+# The app source comes in as a named build context (see docker-compose.yml: additional_contexts).
+
+FROM node:22-alpine AS app
+WORKDIR /src
+COPY --from=app_src package*.json ./
+RUN npm ci
+COPY --from=app_src . .
+ARG VITE_API_URL
+ARG VITE_TURNSTILE_SITE_KEY=""
+ARG VITE_GOOGLE_MAPS_KEY=""
+ARG VITE_GOOGLE_MAP_ID=""
+ENV VITE_API_URL=$VITE_API_URL VITE_TURNSTILE_SITE_KEY=$VITE_TURNSTILE_SITE_KEY VITE_GOOGLE_MAPS_KEY=$VITE_GOOGLE_MAPS_KEY VITE_GOOGLE_MAP_ID=$VITE_GOOGLE_MAP_ID
+RUN npm run build
+
+FROM caddy:2-alpine
+COPY --from=app /src/dist /srv/app
+RUN mkdir -p /etc/caddy/extra
+COPY Caddyfile /etc/caddy/Caddyfile
