@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({
   business: { findUnique: vi.fn() },
-  guest: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
+  guest: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), delete: vi.fn() },
   guestToken: { count: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   membership: { upsert: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
 }));
@@ -16,7 +16,7 @@ import { hashToken } from "../src/lib/tokens.js";
 const GUEST = { id: "g1", email: "tourist@example.com", name: null, lang: "en", emailVerifiedAt: null };
 const BIZ = { id: "b1", code: "abcd2345", name: "Konoba <Ribar>", publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000) };
 
-async function call(method: "GET" | "POST" | "PATCH" | "PUT", url: string, payload?: object, cookie?: string) {
+async function call(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, payload?: object, cookie?: string) {
   const app = await buildApp();
   const res = await app.inject({ method, url, payload, headers: cookie ? { cookie } : {} });
   await app.close();
@@ -169,5 +169,39 @@ describe("a signed-in guest", () => {
 
   it("signs out by clearing the cookie", async () => {
     expect(String((await call("POST", "/guest/logout")).headers["set-cookie"])).toMatch(/guest=;/);
+  });
+});
+
+describe("a guest's own data", () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.guest.findUnique.mockResolvedValue({ ...GUEST, createdAt: new Date("2026-10-01T00:00:00Z") });
+  });
+
+  it("exports what is held about the signed-in guest and nothing about others", async () => {
+    db.membership.findMany.mockResolvedValue([
+      { joinedAt: new Date("2026-10-02T00:00:00Z"), visits: 3, lastVisitAt: null, marketingOptInAt: null, business: { code: "abcd2345", name: "Konoba" }, reviewPrompts: [], loyaltyCards: [], loyaltyPunches: [{ day: "2026-10-02", method: "GEO", createdAt: new Date() }], couponUses: [{ createdAt: new Date("2026-10-03T00:00:00Z"), coupon: { title: "10% off" } }] },
+    ]);
+    const res = await call("GET", "/guest/me/export", undefined, `guest=${await guestCookie()}`);
+    expect(res.statusCode).toBe(200);
+    const body = res.json();
+    expect(body.guest.email).toBe("tourist@example.com");
+    expect(body.businesses[0]).toMatchObject({ code: "abcd2345", visits: 3, couponsUsed: [{ title: "10% off" }] });
+    expect(db.membership.findMany.mock.calls[0]![0].where).toEqual({ guestId: "g1" });
+  });
+
+  it("deletes the guest and signs them out", async () => {
+    db.guest.delete.mockResolvedValue(GUEST);
+    const res = await call("DELETE", "/guest/me", undefined, `guest=${await guestCookie()}`);
+    expect(res.statusCode).toBe(200);
+    expect(db.guest.delete).toHaveBeenCalledWith({ where: { id: "g1" } });
+    expect(String(res.headers["set-cookie"])).toMatch(/guest=;/);
+  });
+
+  it("refuses both without a guest session, and for an owner session", async () => {
+    expect((await call("GET", "/guest/me/export")).statusCode).toBe(401);
+    expect((await call("DELETE", "/guest/me")).statusCode).toBe(401);
+    expect((await call("DELETE", "/guest/me", undefined, `guest=${await guestCookie(null)}`)).statusCode).toBe(401);
+    expect(db.guest.delete).not.toHaveBeenCalled();
   });
 });

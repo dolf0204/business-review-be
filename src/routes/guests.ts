@@ -103,6 +103,38 @@ export async function guestRoutes(app: FastifyInstance) {
     return guestView(await prisma.guest.update({ where: { id: g.id }, data: req.body }));
   });
 
+  // Everything we hold about the signed-in guest, as a download (the right of access).
+  r.get("/guest/me/export", { preHandler: needGuest }, async (req) => {
+    const g = guestFrom(req);
+    const memberships = await prisma.membership.findMany({
+      where: { guestId: g.id },
+      select: {
+        joinedAt: true, visits: true, lastVisitAt: true, marketingOptInAt: true,
+        business: { select: { code: true, name: true } },
+        reviewPrompts: { select: { platform: true, status: true, updatedAt: true } },
+        loyaltyCards: { select: { goal: true, rewardText: true, completedAt: true, redeemedAt: true, createdAt: true } },
+        loyaltyPunches: { select: { day: true, method: true, createdAt: true } },
+        couponUses: { select: { createdAt: true, coupon: { select: { title: true } } } },
+      },
+    });
+    return {
+      exportedAt: new Date().toISOString(),
+      guest: { email: g.email, name: g.name, lang: g.lang, createdAt: g.createdAt },
+      businesses: memberships.map((m) => ({
+        code: m.business.code, name: m.business.name, joinedAt: m.joinedAt, visits: m.visits, lastVisitAt: m.lastVisitAt,
+        offersByEmailSince: m.marketingOptInAt, reviewPrompts: m.reviewPrompts, loyaltyCards: m.loyaltyCards, stamps: m.loyaltyPunches,
+        couponsUsed: m.couponUses.map((u) => ({ title: u.coupon.title, usedAt: u.createdAt })),
+      })),
+    };
+  });
+
+  // Deletes the guest and, through the database cascade, every membership, stamp, coupon use and sign-in link. Nothing is kept.
+  r.delete("/guest/me", { preHandler: needGuest }, async (req, reply) => {
+    await prisma.guest.delete({ where: { id: guestFrom(req).id } });
+    reply.clearCookie("guest", { path: "/" });
+    return { ok: true };
+  });
+
   r.post("/guest/logout", async (_req, reply) => {
     reply.clearCookie("guest", { path: "/" });
     return { ok: true };
