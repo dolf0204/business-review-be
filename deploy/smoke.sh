@@ -18,8 +18,8 @@ code() { curl -s -o /dev/null -m 15 -w '%{http_code}' "$@"; }
 [ "$(code "$API/public/b/zzzzzzzz")" = 404 ] && ok "an unknown business is 404" || bad "unknown business was not 404"
 [ "$(code "$API/auth/me")" = 401 ] && ok "owner area is closed without a session" || bad "/auth/me was not 401"
 [ "$(code "$API/guest/me")" = 401 ] && ok "guest area is closed without a session" || bad "/guest/me was not 401"
-[ "$(code "$API/partners")" = 401 ] && ok "partner feed is closed without a key" || bad "/partners was not 401"
-[ "$(code -X POST "$API/stripe/webhook" -d '{}')" = 400 ] && ok "Stripe webhook refuses an unsigned request" || bad "webhook did not answer 400 to an unsigned request"
+[ "$(code "$API/partners?lat=44.1&lng=15.2")" = 401 ] && ok "partner feed is closed without a key" || bad "/partners was not 401"
+[ "$(code -X POST "$API/stripe/webhook" -H 'content-type: application/json' -d '{}')" = 400 ] && ok "Stripe webhook refuses an unsigned request" || bad "webhook did not answer 400 to an unsigned request"
 [ "$(code -X DELETE "$API/guest/me")" = 401 ] && ok "deleting guest data needs a session" || bad "DELETE /guest/me was not 401"
 
 # The browser may call the API only from the app's own address.
