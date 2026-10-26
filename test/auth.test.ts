@@ -8,6 +8,8 @@ const db = vi.hoisted(() => ({
 vi.mock("../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
 vi.mock("../src/lib/mail.js", () => mail);
+const captcha = vi.hoisted(() => ({ verifyTurnstile: vi.fn() }));
+vi.mock("../src/lib/turnstile.js", () => captcha);
 
 import { buildApp } from "../src/app.js";
 import { hashToken } from "../src/lib/tokens.js";
@@ -23,8 +25,26 @@ describe("sign up and sign in", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mail.sendMail.mockResolvedValue(undefined);
+    captcha.verifyTurnstile.mockResolvedValue(true);
     db.user.findUnique.mockResolvedValue(null);
     db.user.create.mockResolvedValue({ id: "u1" });
+  });
+
+  it("creates no account and sends no mail when the robot check fails, on sign-up and on password reset", async () => {
+    captcha.verifyTurnstile.mockResolvedValue(false);
+    const reg = await call("POST", "/auth/register", { email: "new@example.com", password: "correct horse battery", turnstileToken: "bad" });
+    expect(reg.statusCode).toBe(400);
+    expect(reg.json()).toEqual({ error: "captcha_failed" });
+    const forgot = await call("POST", "/auth/forgot-password", { email: "new@example.com" });
+    expect(forgot.statusCode).toBe(400);
+    expect(db.user.create).not.toHaveBeenCalled();
+    expect(db.user.findUnique).not.toHaveBeenCalled();
+    expect(mail.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("passes the token the browser sent to the check", async () => {
+    await call("POST", "/auth/register", { email: "new@example.com", password: "correct horse battery", turnstileToken: "tok" });
+    expect(captcha.verifyTurnstile.mock.calls[0]![0]).toBe("tok");
   });
 
   it("registers, stores only a hash of the password, and mails a confirm link to the front end", async () => {

@@ -7,6 +7,7 @@ import { prisma } from "../db.js";
 import type { TokenKind } from "../generated/prisma/enums.js";
 import { sendMail } from "../lib/mail.js";
 import { hashToken, newToken } from "../lib/tokens.js";
+import { verifyTurnstile } from "../lib/turnstile.js";
 import { UI_LANGS } from "../schemas.js";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -46,9 +47,11 @@ export async function authRoutes(app: FastifyInstance) {
 
   r.post("/auth/register", {
     ...strict,
-    schema: { body: z.object({ email, password, name: z.string().trim().max(100).optional(), uiLang: z.string().max(5).optional() }) },
+    schema: { body: z.object({ email, password, name: z.string().trim().max(100).optional(), uiLang: z.string().max(5).optional(), turnstileToken: z.string().max(4000).optional() }) },
   }, async (req, reply) => {
     const { email: addr, password: pw, name, uiLang } = req.body;
+    // Sign-up sends a mail to any address given, so it is checked for robots first.
+    if (!(await verifyTurnstile(req.body.turnstileToken, req.ip))) return reply.code(400).send({ error: "captcha_failed" });
     const existing = await prisma.user.findUnique({ where: { email: addr } });
     // Same response either way so the endpoint cannot be used to probe for accounts.
     if (!existing) {
@@ -89,7 +92,8 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  r.post("/auth/forgot-password", { ...strict, schema: { body: z.object({ email }) } }, async (req, reply) => {
+  r.post("/auth/forgot-password", { ...strict, schema: { body: z.object({ email, turnstileToken: z.string().max(4000).optional() }) } }, async (req, reply) => {
+    if (!(await verifyTurnstile(req.body.turnstileToken, req.ip))) return reply.code(400).send({ error: "captcha_failed" });
     const user = await prisma.user.findUnique({ where: { email: req.body.email } });
     if (user) {
       const token = await issueToken(user.id, "RESET_PASSWORD", 60 * 60 * 1000);
