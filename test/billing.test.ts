@@ -122,6 +122,18 @@ describe("the owner's billing screen", () => {
     expect(res.json()).toMatchObject({ available: true, paid: false, prices: [{ interval: "MONTH", amountCents: 1900, currency: "eur" }, { interval: "YEAR", amountCents: 19000 }] });
   });
 
+  it("shows the prices to visitors who are not signed in, and nothing when Stripe fails", async () => {
+    const app = await buildApp();
+    const ok = await app.inject({ url: "/public/pricing" });
+    expect(ok.statusCode).toBe(200);
+    expect(ok.json().prices).toEqual([{ interval: "MONTH", amountCents: 1900, currency: "eur" }, { interval: "YEAR", amountCents: 19000, currency: "eur" }]);
+    expect(ok.headers["cache-control"]).toContain("max-age=300");
+    clearPriceCache();
+    stripeApi.prices.retrieve.mockRejectedValue(new Error("down"));
+    expect((await app.inject({ url: "/public/pricing" })).json()).toEqual({ prices: [] });
+    await app.close();
+  });
+
   it("starts a checkout for the chosen price, with return addresses from config and the business in the metadata", async () => {
     db.user.findUniqueOrThrow.mockResolvedValue({ email: "o@example.com", stripeCustomerId: null });
     stripeApi.customers.create.mockResolvedValue({ id: "cus_1" });

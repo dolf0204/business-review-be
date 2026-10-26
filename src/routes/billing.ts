@@ -16,6 +16,17 @@ export async function billingRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const auth = { onRequest: [app.authenticate] };
 
+  // The two prices for the home page, read from Stripe (never written in our code). No prices when billing is off or Stripe cannot be reached.
+  r.get("/public/pricing", { config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (_req, reply) => {
+    reply.header("cache-control", "public, max-age=300");
+    if (!billingConfigured()) return { prices: [] };
+    try {
+      return { prices: await loadPrices() };
+    } catch {
+      return { prices: [] };
+    }
+  });
+
   r.get("/businesses/:id/billing", { ...auth, schema: { params: idParam } }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
