@@ -3,6 +3,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { prisma } from "../db.js";
 import { isLive } from "../lib/live.js";
+import { couponOpen } from "./coupons.js";
 import { publicBusiness } from "../lib/businessView.js";
 
 /** What a guest can read. Only published businesses exist here; everything else answers not found. */
@@ -19,7 +20,8 @@ export async function publicRoutes(app: FastifyInstance) {
     // The latest five posts that have not ended.
     const posts = await prisma.post.findMany({ where: { businessId: b.id, OR: [{ endsAt: null }, { endsAt: { gte: now } }] }, orderBy: { createdAt: "desc" }, take: 5 });
     const loyalty = await prisma.loyaltyProgram.findUnique({ where: { businessId: b.id } });
+    const coupons = (await prisma.coupon.findMany({ where: { businessId: b.id, active: true }, orderBy: { createdAt: "desc" }, take: 20 })).filter((c) => couponOpen(c, now));
     reply.header("cache-control", "no-cache");
-    return publicBusiness(b, posts, loyalty);
+    return publicBusiness(b, posts, loyalty, coupons);
   });
 }

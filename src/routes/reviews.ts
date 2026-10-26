@@ -95,7 +95,7 @@ export async function reviewRoutes(app: FastifyInstance) {
   r.get("/businesses/:id/stats", { onRequest: [app.authenticate], schema: { params: idParam } }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
-    const [members, offers, visits, google, tripadvisor, stamps, rewards] = await Promise.all([
+    const [members, offers, visits, google, tripadvisor, stamps, rewards, couponUses] = await Promise.all([
       prisma.membership.count({ where: { businessId: b.id } }),
       prisma.membership.count({ where: { businessId: b.id, marketingOptInAt: { not: null } } }),
       prisma.membership.aggregate({ where: { businessId: b.id }, _sum: { visits: true } }),
@@ -103,7 +103,8 @@ export async function reviewRoutes(app: FastifyInstance) {
       prisma.reviewPrompt.count({ where: { membership: { businessId: b.id }, platform: "TRIPADVISOR", status: "DONE" } }),
       prisma.loyaltyPunch.count({ where: { membership: { businessId: b.id } } }),
       prisma.loyaltyCard.count({ where: { membership: { businessId: b.id }, redeemedAt: { not: null } } }),
+      prisma.couponUse.count({ where: { coupon: { businessId: b.id } } }),
     ]);
-    return { members, offersOptIn: offers, visits: visits._sum.visits ?? 0, googleReviewClicks: google, tripadvisorReviewClicks: tripadvisor, stamps, rewardsRedeemed: rewards };
+    return { members, offersOptIn: offers, visits: visits._sum.visits ?? 0, googleReviewClicks: google, tripadvisorReviewClicks: tripadvisor, stamps, rewardsRedeemed: rewards, couponUses };
   });
 }

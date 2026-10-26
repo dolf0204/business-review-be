@@ -93,6 +93,7 @@ model Business {
   campaigns     Campaign[]
   subscription  BusinessSubscription?
   kitRequests   KitRequest[]
+  coupons       Coupon[]
   memberships   Membership[]
   guestTokens   GuestToken[]
 
@@ -150,6 +151,7 @@ model Membership {
   reviewPrompts    ReviewPrompt[]
   loyaltyCards     LoyaltyCard[]
   loyaltyPunches   LoyaltyPunch[]
+  couponUses       CouponUse[]
 
   @@unique([guestId, businessId])
   @@index([businessId])
@@ -342,4 +344,35 @@ model KitRequest {
   business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, createdAt])
+}
+
+// A discount a business offers its guests, for example "10% off lunch". A guest uses it once; staff confirm with the code of the day.
+model Coupon {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @db.Uuid
+  title       String
+  description String?
+  // Outside this window the coupon is not shown and cannot be used. Null means no limit on that side.
+  startsAt    DateTime?
+  endsAt      DateTime?
+  active      Boolean   @default(true)
+  createdAt   DateTime  @default(now())
+
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  uses        CouponUse[]
+
+  @@index([businessId, createdAt])
+}
+
+// A guest has used a coupon. The unique pair is what makes it once per guest, even if the button is tapped twice at once.
+model CouponUse {
+  id           String     @id @default(uuid()) @db.Uuid
+  couponId     String     @db.Uuid
+  membershipId String     @db.Uuid
+  createdAt    DateTime   @default(now())
+
+  coupon       Coupon     @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([couponId, membershipId])
 }

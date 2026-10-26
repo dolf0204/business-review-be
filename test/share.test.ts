@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const db = vi.hoisted(() => ({ business: { findFirst: vi.fn(), findUnique: vi.fn() }, post: { findMany: vi.fn() }, loyaltyProgram: { findUnique: vi.fn() } }));
+const db = vi.hoisted(() => ({ business: { findFirst: vi.fn(), findUnique: vi.fn() }, post: { findMany: vi.fn() }, loyaltyProgram: { findUnique: vi.fn() }, coupon: { findMany: vi.fn() } }));
 vi.mock("../src/db.js", () => ({ prisma: db }));
 
 import { buildApp } from "../src/app.js";
@@ -64,6 +64,7 @@ describe("the guest page data", () => {
   beforeEach(() => {
     db.post.findMany.mockResolvedValue([]);
     db.loyaltyProgram.findUnique.mockResolvedValue(null);
+    db.coupon.findMany.mockResolvedValue([]);
   });
   const get = async (code = "abcd2345") => {
     const app = await buildApp();

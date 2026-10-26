@@ -116,6 +116,7 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Pictures | `POST /uploads` (JPG, PNG or WebP up to 8 MB, re-encoded as WebP, metadata removed, 30 MB per owner), `GET /uploads/usage`, `GET /media/<id>.webp` (public). Logo and background are `logoUrl` and `backgroundUrl` of a business; a replaced picture is deleted. |
 | Billing | `GET /businesses/:id/billing`, `POST .../billing/checkout`, `/confirm`, `/portal`, `POST /stripe/webhook`. See [`docs/PAYMENTS.md`](docs/PAYMENTS.md): a page needs a paid subscription to be published and to stay live. |
 | Free kit | `GET/POST /businesses/:id/kit` (paid pages only, one per business: address and the line printed on the sign); the maker marks it posted from a link in the mail: `GET /public/operator/kit`, `POST /public/operator/kit/shipped` |
+| Coupons | Owner: `GET/POST /businesses/:id/coupons` (title, text, optional dates, up to 10; also today's staff code), `PATCH /coupons/:id` (switch on or off), `DELETE /coupons/:id`. Guest: `GET /guest/b/:code/coupons`, `POST /guest/b/:code/coupons/:id/use` (staff code, once per guest). Open coupons are also part of `GET /public/b/:code`. |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -128,7 +129,7 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-142 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+151 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
 
 ## Guests and privacy (slice 3)
 
@@ -189,3 +190,10 @@ A paid page can ask once for a plastic sign with its QR code and an NFC tag. The
 characters). The request is saved, and `KIT_ORDER_EMAIL` gets a mail with what to print, the QR code as PNG and SVG, the exact address to write on the NFC tag (`?s=n`), the shipping
 address, and a link. After posting it, the maker opens the link, optionally adds a tracking link, and the owner gets "on its way". The link's key is an HMAC of the request id, so there is no login.
 If the mail cannot be sent, the request is still saved. Who makes and posts the kits, and whether it stays free, is a business decision outside the code.
+
+## Coupons
+
+A coupon is a discount a business offers, for example "10% off lunch": a title (60 characters), an optional text (200), optional dates, and an on/off switch; up to ten per business. Everyone
+sees the open coupons on the business page; a member taps "Use" and **staff confirm by entering the staff code of the day on the guest's phone** (the same six digits as for the loyalty card,
+shown to the owner next to the coupons). Each guest can use a coupon once: the database enforces it (unique coupon and membership), so a double tap cannot use it twice. Outside its dates, or
+when switched off, a coupon is not shown and cannot be used. The owner sees how often each coupon was used.
