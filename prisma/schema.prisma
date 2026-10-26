@@ -92,6 +92,7 @@ model Business {
   loyaltyProgram LoyaltyProgram?
   campaigns     Campaign[]
   subscription  BusinessSubscription?
+  kitRequests   KitRequest[]
   memberships   Membership[]
   guestTokens   GuestToken[]
 
@@ -311,4 +312,34 @@ model BusinessSubscription {
   updatedAt            DateTime           @updatedAt
 
   business             Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+}
+
+enum KitStatus {
+  REQUESTED
+  SHIPPED
+  CANCELED
+}
+
+// The free kit that comes with a paid page: a plastic sign with the QR code and an NFC tag, made and posted by the operator.
+model KitRequest {
+  id          String    @id @default(uuid()) @db.Uuid
+  businessId  String    @db.Uuid
+  status      KitStatus @default(REQUESTED)
+  // Shipping address.
+  name        String
+  line1       String
+  line2       String?
+  postalCode  String
+  city        String
+  country     String
+  phone       String?
+  // The line printed on the sign, for example the business name.
+  printText   String
+  trackingUrl String?
+  createdAt   DateTime  @default(now())
+  shippedAt   DateTime?
+
+  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+
+  @@index([businessId, createdAt])
 }

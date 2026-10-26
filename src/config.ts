@@ -24,6 +24,10 @@ const schema = z.object({
   STRIPE_AUTOMATIC_TAX: z.stringbool().default(false),
   // Free days before the first payment. 0 = no trial.
   TRIAL_DAYS: z.coerce.number().int().min(0).max(90).default(0),
+  // Where a request for the free QR and NFC kit is sent (the person who makes and posts it). Empty = kit requests answer 503.
+  KIT_ORDER_EMAIL: z.string().default(""),
+  // Countries the kit is posted to (ISO codes, comma separated). The default is Europe.
+  KIT_SHIP_COUNTRIES: z.string().default("AT,BE,BG,HR,CY,CZ,DK,EE,FI,FR,DE,GR,HU,IE,IT,LV,LT,LU,MT,NL,PL,PT,RO,SK,SI,ES,SE,IS,LI,NO,CH,GB,AL,BA,ME,MK,RS"),
   // Where uploaded images are kept. A persistent volume in production.
   UPLOAD_DIR: z.string().default("uploads"),
   // Server key for the Places API (New), used to look a business up from its Google Maps link.

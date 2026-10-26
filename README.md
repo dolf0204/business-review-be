@@ -69,6 +69,7 @@ All variables are validated in [`src/config.ts`](src/config.ts); a wrong value s
 | `OPERATOR_EMAILS` | Comma separated emails that get a mail with approve and reject buttons when a business goes live or changes. Only approved businesses are in `GET /partners`. |
 | `UPLOAD_DIR` | Where logos and backgrounds are kept (default `uploads`). A persistent volume in production, backed up with the database. |
 | `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRICE_MONTHLY`, `STRIPE_PRICE_YEARLY`, `STRIPE_PORTAL_CONFIGURATION`, `STRIPE_AUTOMATIC_TAX`, `TRIAL_DAYS` | Billing, see [`docs/PAYMENTS.md`](docs/PAYMENTS.md). Empty key = nobody can publish. |
+| `KIT_ORDER_EMAIL`, `KIT_SHIP_COUNTRIES` | Who makes and posts the free kit, and the countries it goes to (default Europe). Empty email = kit requests are off. |
 | `GOOGLE_PLACES_API_KEY` | Places API (New) server key. |
 | `TURNSTILE_SECRET` | Cloudflare Turnstile secret for the guest forms. |
 | `BREVO_API_KEY`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME` | Email. Empty key = emails are logged. |
@@ -114,6 +115,7 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Operator (slice 7) | Mail with a link to `/operator/review`; `GET /public/operator/review?b&k`, `POST /public/operator/decision` (approve or reject, the key in the link is the proof) |
 | Pictures | `POST /uploads` (JPG, PNG or WebP up to 8 MB, re-encoded as WebP, metadata removed, 30 MB per owner), `GET /uploads/usage`, `GET /media/<id>.webp` (public). Logo and background are `logoUrl` and `backgroundUrl` of a business; a replaced picture is deleted. |
 | Billing | `GET /businesses/:id/billing`, `POST .../billing/checkout`, `/confirm`, `/portal`, `POST /stripe/webhook`. See [`docs/PAYMENTS.md`](docs/PAYMENTS.md): a page needs a paid subscription to be published and to stay live. |
+| Free kit | `GET/POST /businesses/:id/kit` (paid pages only, one per business: address and the line printed on the sign); the maker marks it posted from a link in the mail: `GET /public/operator/kit`, `POST /public/operator/kit/shipped` |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -126,7 +128,7 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-131 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+142 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
 
 ## Guests and privacy (slice 3)
 
@@ -180,3 +182,10 @@ Anyone can connect a business to any Google place, because ownership is not prov
 approved it: the first time it is published (and whenever an approved business changes its name, subtitle, offer or Google place) the operators in
 `OPERATOR_EMAILS` get a mail with the details and a link to a page with Approve and Reject. The key in the link (an HMAC of the business id) is the proof; there
 is no operator login. Approval does not affect the business's own page or its loyalty card, only the sponsor listing in TouristAsk.
+
+## The free kit
+
+A paid page can ask once for a plastic sign with its QR code and an NFC tag. The owner gives a shipping address (countries from `KIT_SHIP_COUNTRIES`) and the line to print (up to 32
+characters). The request is saved, and `KIT_ORDER_EMAIL` gets a mail with what to print, the QR code as PNG and SVG, the exact address to write on the NFC tag (`?s=n`), the shipping
+address, and a link. After posting it, the maker opens the link, optionally adds a tracking link, and the owner gets "on its way". The link's key is an HMAC of the request id, so there is no login.
+If the mail cannot be sent, the request is still saved. Who makes and posts the kits, and whether it stays free, is a business decision outside the code.
