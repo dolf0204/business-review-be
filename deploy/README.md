@@ -30,6 +30,7 @@ API on http://localhost:8090, app on http://localhost:5190.
 
 - Update: `./update.sh` (pulls both repositories, backs up, rebuilds; migrations run when the API starts).
 - Backup: `./backup.sh prod` into `deploy/backups/`, 14 days kept. Add to cron, for example `0 3 * * * /opt/businessask/business-review-be/deploy/backup.sh prod`.
+- Smoke test: `./smoke.sh https://businessask.eu https://api.businessask.eu` checks a running stack from the outside. The full list of things to verify with the real services is `GO-LIVE.md`.
 - Restore: `./restore.sh prod backups/<date>` (deletes current data after confirmation).
 - Logs: `./compose.sh prod logs -f api`.
 
