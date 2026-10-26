@@ -45,7 +45,7 @@ describe("when to ask for a review", () => {
 });
 
 const GUEST = { id: "g1" };
-const BIZ = { id: "b1", publishedAt: new Date(), tripadvisorReviewUrl: "https://www.tripadvisor.com/Restaurant-x", googleReviewUrl: "https://g.page/r/abc/review" };
+const BIZ = { id: "b1", publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), tripadvisorReviewUrl: "https://www.tripadvisor.com/Restaurant-x", googleReviewUrl: "https://g.page/r/abc/review" };
 const member = (over = {}) => ({ id: "m1", visits: 1, lastVisitAt: new Date(), reviewPrompts: [], ...over });
 
 async function call(method: "GET" | "POST", url: string, signedIn = true) {

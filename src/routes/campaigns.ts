@@ -4,6 +4,7 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { ownedBusiness } from "../lib/access.js";
+import { isLive } from "../lib/live.js";
 import { sendMail } from "../lib/mail.js";
 import { offerMailHtml } from "../lib/offerMail.js";
 import { isUnsubscribeKey, unsubscribeKey } from "../lib/unsubscribe.js";
@@ -98,7 +99,7 @@ export async function campaignRoutes(app: FastifyInstance) {
   r.post("/businesses/:id/campaigns", { ...auth, schema: { params: idParam, body }, config: { rateLimit: { max: 10, timeWindow: "1 hour" } } }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
-    if (!b.publishedAt) return reply.code(422).send({ error: "not_published" });
+    if (!isLive(b)) return reply.code(422).send({ error: "not_published" });
     const since = new Date(Date.now() - MAX_CAMPAIGNS_PERIOD_DAYS * DAY);
     if ((await prisma.campaign.count({ where: { businessId: b.id, createdAt: { gte: since } } })) > 0) return reply.code(429).send({ error: "campaign_limit_week" });
     const audience = await prisma.membership.count({ where: { businessId: b.id, marketingOptInAt: { not: null }, guest: { emailVerifiedAt: { not: null } } } });

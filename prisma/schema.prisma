@@ -26,6 +26,8 @@ model User {
   businesses      Business[]
   tokens          AuthToken[]
   uploads         Upload[]
+  // The Stripe customer of this owner, created at the first checkout.
+  stripeCustomerId String? @unique
 }
 
 // One-time links sent by email (confirm the address, reset the password). Only a hash is stored.
@@ -81,12 +83,15 @@ model Business {
   // The operator has checked the page. Only approved businesses are given to TouristAsk as sponsors. Changing the name, offer or
   // Google place of an approved business clears this until it is checked again.
   approvedAt    DateTime?
+  // The subscription is paid up to this moment. Null or past: the page is not shown to guests. Copied from Stripe whenever it changes.
+  paidUntil     DateTime?
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
   posts         Post[]
   loyaltyProgram LoyaltyProgram?
   campaigns     Campaign[]
+  subscription  BusinessSubscription?
   memberships   Membership[]
   guestTokens   GuestToken[]
 
@@ -280,4 +285,30 @@ model Upload {
   owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
+}
+
+enum SubscriptionStatus {
+  ACTIVE   // paid, or in the free trial
+  PAST_DUE // the last payment failed; Stripe is still trying
+  CANCELED
+}
+
+enum BillingInterval {
+  MONTH
+  YEAR
+}
+
+// One subscription per business. Stripe is the source of truth; this is what we last read from it.
+model BusinessSubscription {
+  id                   String             @id @default(uuid()) @db.Uuid
+  businessId           String             @unique @db.Uuid
+  stripeSubscriptionId String?            @unique
+  status               SubscriptionStatus @default(ACTIVE)
+  interval             BillingInterval    @default(MONTH)
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean            @default(false)
+  createdAt            DateTime           @default(now())
+  updatedAt            DateTime           @updatedAt
+
+  business             Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }

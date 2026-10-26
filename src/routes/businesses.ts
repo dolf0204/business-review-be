@@ -71,6 +71,8 @@ export async function businessRoutes(app: FastifyInstance) {
     if (!b) return reply.code(404).send({ error: "not_found" });
     const problem = publishProblem(b);
     if (problem) return reply.code(422).send({ error: problem });
+    // Paying is what makes a page work: no payment, no publishing.
+    if (!b.paidUntil || b.paidUntil <= new Date()) return reply.code(402).send({ error: "payment_required" });
     const updated = await prisma.business.update({ where: { id: b.id }, data: { publishedAt: b.publishedAt ?? new Date() } });
     // The first time a business goes live (and is not yet approved), the operator is asked to look at it.
     if (!b.publishedAt && !updated.approvedAt) await requestApproval(updated, false, req.log);

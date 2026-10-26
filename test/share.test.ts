@@ -11,7 +11,7 @@ const row = (over = {}) => ({
   id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba Ribar", kind: "restaurant", subtitle: "Fresh fish", offerText: "10% off", address: "Obala 1, Zadar",
   lat: 44.12, lng: 15.23, googlePlaceId: "ChIJ1", googleMapsUrl: "https://maps.google.com/?cid=1", googleReviewUrl: "https://g.page/r/x/review",
   tripadvisorReviewUrl: null, websiteUrl: "https://k.example.com", instagramUrl: null, facebookUrl: null, phone: "023 1", contactEmail: null, logoUrl: null, backgroundUrl: null,
-  rating: 4.7, ratingCount: 300, theme: { template: "warm" }, publishedAt: new Date(), ...over,
+  rating: 4.7, ratingCount: 300, theme: { template: "warm" }, publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), ...over,
 });
 
 async function owner(url: string) {

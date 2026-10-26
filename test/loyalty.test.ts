@@ -84,7 +84,7 @@ describe("setting up the program", () => {
 
 describe("stamps", () => {
   const PROGRAM = { enabled: true, goal: 3, rewardText: "Free meal", startsAt: null, endsAt: null, radiusMeters: 150 };
-  const BIZ = { id: B, publishedAt: new Date(), lat: 44.12, lng: 15.23, loyaltyProgram: PROGRAM };
+  const BIZ = { id: B, publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), lat: 44.12, lng: 15.23, loyaltyProgram: PROGRAM };
   const card = (punches: number, over = {}) => ({ id: "c1", membershipId: "m1", goal: 3, rewardText: "Free meal", completedAt: null, redeemedAt: null, _count: { punches }, ...over });
 
   async function call(url: string, payload?: object, signedIn = true) {

@@ -7,6 +7,7 @@ import { ownedBusiness } from "../lib/access.js";
 import { DEFAULT_RADIUS_METERS, distanceMeters, isNearEnough, isStaffCode, staffCode, utcDay, windowState } from "../lib/loyalty.js";
 import { idParam } from "../schemas.js";
 import { guestOf } from "./guests.js";
+import { isLive } from "../lib/live.js";
 
 const code = z.string().min(4).max(32);
 const date = z.coerce.date().nullable().optional();
@@ -51,8 +52,8 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   async function context(req: FastifyRequest, businessCode: string) {
     const guest = await guestOf(app, req);
     if (!guest) return { ok: false as const, status: 401, error: "unauthenticated" };
-    const business = await prisma.business.findUnique({ where: { code: businessCode }, select: { id: true, publishedAt: true, lat: true, lng: true, loyaltyProgram: true } });
-    if (!business || !business.publishedAt) return { ok: false as const, status: 404, error: "not_found" };
+    const business = await prisma.business.findUnique({ where: { code: businessCode }, select: { id: true, publishedAt: true, paidUntil: true, lat: true, lng: true, loyaltyProgram: true } });
+    if (!business || !isLive(business)) return { ok: false as const, status: 404, error: "not_found" };
     const membership = await prisma.membership.findUnique({ where: { guestId_businessId: { guestId: guest.id, businessId: business.id } }, select: { id: true } });
     if (!membership) return { ok: false as const, status: 403, error: "not_member" };
     return { ok: true as const, business, membership, program: business.loyaltyProgram?.enabled ? business.loyaltyProgram : null };

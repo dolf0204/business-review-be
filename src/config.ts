@@ -13,6 +13,17 @@ const schema = z.object({
   // Comma separated emails of the people who approve businesses before TouristAsk shows them. Empty = nobody is notified.
   OPERATOR_EMAILS: z.string().default(""),
   PARTNER_API_KEYS: z.string().default(""),
+  // Stripe. Empty key = billing answers 503 and nobody can publish.
+  STRIPE_SECRET_KEY: z.string().default(""),
+  STRIPE_WEBHOOK_SECRET: z.string().default(""),
+  // The two recurring Prices (monthly and yearly) of the BusinessAsk product. The amounts are read from Stripe, never written here.
+  STRIPE_PRICE_MONTHLY: z.string().default(""),
+  STRIPE_PRICE_YEARLY: z.string().default(""),
+  // Customer portal configuration (bpc_...). Empty uses the account's default.
+  STRIPE_PORTAL_CONFIGURATION: z.string().default(""),
+  STRIPE_AUTOMATIC_TAX: z.stringbool().default(false),
+  // Free days before the first payment. 0 = no trial.
+  TRIAL_DAYS: z.coerce.number().int().min(0).max(90).default(0),
   // Where uploaded images are kept. A persistent volume in production.
   UPLOAD_DIR: z.string().default("uploads"),
   // Server key for the Places API (New), used to look a business up from its Google Maps link.

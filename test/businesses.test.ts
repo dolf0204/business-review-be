@@ -17,8 +17,9 @@ const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({
   id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba", kind: "restaurant", subtitle: null, offerText: null, address: null, lat: null, lng: null,
   googlePlaceId: null, googleMapsUrl: null, googleReviewUrl: null, tripadvisorReviewUrl: null, websiteUrl: null, instagramUrl: null, facebookUrl: null,
-  phone: null, contactEmail: null, logoUrl: null, backgroundUrl: null, rating: null, ratingCount: null, theme: {}, publishedAt: null, approvedAt: null, ...over,
+  phone: null, contactEmail: null, logoUrl: null, backgroundUrl: null, rating: null, ratingCount: null, theme: {}, publishedAt: null, approvedAt: null, paidUntil: null, ...over,
 });
+const PAID = new Date(Date.now() + 30 * 86_400_000);
 
 async function call(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, payload?: object) {
   const app = await buildApp();
@@ -96,6 +97,12 @@ describe("businesses", () => {
     expect(no.statusCode).toBe(422);
     expect(no.json().error).toBe("google_not_connected");
     db.business.findFirst.mockResolvedValue(row({ googlePlaceId: "ChIJabcdefghij123", lat: 44.1, lng: 15.2 }));
+    const unpaid = await call("POST", `/businesses/${ID}/publish`);
+    expect(unpaid.statusCode).toBe(402);
+    expect(unpaid.json().error).toBe("payment_required");
+    db.business.findFirst.mockResolvedValue(row({ googlePlaceId: "ChIJabcdefghij123", lat: 44.1, lng: 15.2, paidUntil: new Date(Date.now() - 1000) }));
+    expect((await call("POST", `/businesses/${ID}/publish`)).json().error).toBe("payment_required");
+    db.business.findFirst.mockResolvedValue(row({ googlePlaceId: "ChIJabcdefghij123", lat: 44.1, lng: 15.2, paidUntil: PAID }));
     const yes = await call("POST", `/businesses/${ID}/publish`);
     expect(yes.statusCode).toBe(200);
     expect(db.business.update.mock.calls.at(-1)![0].data.publishedAt).toBeInstanceOf(Date);
@@ -106,7 +113,7 @@ describe("businesses", () => {
 });
 
 describe("operator approval", () => {
-  const live = (over = {}) => row({ googlePlaceId: "ChIJabcdefghij123", lat: 44.1, lng: 15.2, ...over });
+  const live = (over = {}) => row({ googlePlaceId: "ChIJabcdefghij123", lat: 44.1, lng: 15.2, paidUntil: PAID, ...over });
   // The database answers with the row as it was plus what was changed.
   const found = (r: ReturnType<typeof row>) => {
     db.business.findFirst.mockResolvedValue(r);
@@ -129,7 +136,7 @@ describe("operator approval", () => {
   });
 
   it("does not ask again for a business that is already live or already approved", async () => {
-    found(live({ publishedAt: new Date() }));
+    found(live({ publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000) }));
     await call("POST", `/businesses/${ID}/publish`);
     found(live({ approvedAt: new Date() }));
     await call("POST", `/businesses/${ID}/publish`);
@@ -137,14 +144,14 @@ describe("operator approval", () => {
   });
 
   it("takes the approval back when an approved business changes what guests read, and asks again if it is live", async () => {
-    found(live({ approvedAt: new Date(), publishedAt: new Date(), offerText: "10% off" }));
+    found(live({ approvedAt: new Date(), publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), offerText: "10% off" }));
     await call("PATCH", `/businesses/${ID}`, { offerText: "Everything free" });
     expect(db.business.update.mock.calls[0]![0].data.approvedAt).toBeNull();
     expect(mail.sendMail.mock.calls[0]![0].subject).toContain("Changed");
   });
 
   it("keeps the approval for changes that do not touch what guests read, or an unchanged value", async () => {
-    found(live({ approvedAt: new Date(), publishedAt: new Date(), offerText: "10% off" }));
+    found(live({ approvedAt: new Date(), publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), offerText: "10% off" }));
     await call("PATCH", `/businesses/${ID}`, { phone: "023 1", offerText: "10% off" });
     expect(db.business.update.mock.calls[0]![0].data.approvedAt).toBeUndefined();
     expect(mail.sendMail).not.toHaveBeenCalled();

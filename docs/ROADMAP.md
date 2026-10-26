@@ -15,6 +15,6 @@ Production addresses: front end `https://businessask.eu`, API `https://api.busin
    the card only when the browser location is near the business (needs HTTPS; a staff-code fallback for guests who block location); one punch per guest per day.
 6. **Offers** (done): the business publishes a special offer; registered guests who opted in get it by email (unsubscribe link in every mail).
 7. **TouristAsk integration**: TouristAsk reads `GET /partners` (cached), shows the businesses under the guide and on the map, and the manual Sponsors screen is removed.
-8. **Billing** (decision pending): Stripe plans for businesses.
+8. **Billing** (done): a Stripe subscription per business (monthly or yearly, prices read from Stripe); no payment, no live page. See PAYMENTS.md.
 
 Open decisions: location fallback, whether Google Business Profile sign-in is worth the approval process, domain name, pricing.

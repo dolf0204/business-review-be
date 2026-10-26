@@ -37,7 +37,7 @@ describe("operator decisions", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mail.sendMail.mockResolvedValue(undefined);
-    db.business.findUnique.mockResolvedValue({ id: ID, name: "Konoba <b>", ownerId: "u1", offerText: "10% off", subtitle: null, address: "Obala 1", googleMapsUrl: null, publishedAt: new Date(), approvedAt: null });
+    db.business.findUnique.mockResolvedValue({ id: ID, name: "Konoba <b>", ownerId: "u1", offerText: "10% off", subtitle: null, address: "Obala 1", googleMapsUrl: null, publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), approvedAt: null });
     db.user.findUnique.mockResolvedValue({ email: "owner@example.com" });
   });
   const post = async (payload: object) => {

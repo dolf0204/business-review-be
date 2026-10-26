@@ -6,6 +6,7 @@ import { ownedBusiness } from "../lib/access.js";
 import { isNewVisitDay, nextStep, platformState, type PlatformState, type PromptRow } from "../lib/reviews.js";
 import { idParam } from "../schemas.js";
 import { guestOf } from "./guests.js";
+import { isLive } from "../lib/live.js";
 
 const code = z.string().min(4).max(32);
 const platform = z.enum(["google", "tripadvisor"]);
@@ -29,8 +30,8 @@ export async function reviewRoutes(app: FastifyInstance) {
   async function memberOf(req: FastifyRequest, businessCode: string) {
     const guest = await guestOf(app, req);
     if (!guest) return { ok: false as const, status: 401 as const };
-    const business = await prisma.business.findUnique({ where: { code: businessCode }, select: { id: true, publishedAt: true, tripadvisorReviewUrl: true } });
-    if (!business || !business.publishedAt) return { ok: false as const, status: 404 as const };
+    const business = await prisma.business.findUnique({ where: { code: businessCode }, select: { id: true, publishedAt: true, paidUntil: true, tripadvisorReviewUrl: true } });
+    if (!business || !isLive(business)) return { ok: false as const, status: 404 as const };
     const membership = await prisma.membership.findUnique({ where: { guestId_businessId: { guestId: guest.id, businessId: business.id } }, include: withPrompts });
     if (!membership) return { ok: false as const, status: 403 as const };
     return { ok: true as const, guest, business, membership };
@@ -71,9 +72,9 @@ export async function reviewRoutes(app: FastifyInstance) {
   // The review link. Following it counts as a review left; the guest is then sent on to Google or Tripadvisor.
   // The target comes only from our own database, never from the address, so this cannot be used as an open redirect.
   r.get("/r/:code/:platform", { schema: { params: z.object({ code, platform }) }, config: { rateLimit: { max: 60, timeWindow: "1 minute" } } }, async (req, reply) => {
-    const business = await prisma.business.findUnique({ where: { code: req.params.code }, select: { id: true, publishedAt: true, googleReviewUrl: true, tripadvisorReviewUrl: true } });
+    const business = await prisma.business.findUnique({ where: { code: req.params.code }, select: { id: true, publishedAt: true, paidUntil: true, googleReviewUrl: true, tripadvisorReviewUrl: true } });
     const target = req.params.platform === "google" ? business?.googleReviewUrl : business?.tripadvisorReviewUrl;
-    if (!business || !business.publishedAt || !target) return reply.code(404).send({ error: "not_found" });
+    if (!business || !isLive(business) || !target) return reply.code(404).send({ error: "not_found" });
     const guest = await guestOf(app, req);
     if (guest) {
       const m = await prisma.membership.findUnique({ where: { guestId_businessId: { guestId: guest.id, businessId: business.id } }, select: { id: true } });

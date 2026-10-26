@@ -14,7 +14,7 @@ import { buildApp } from "../src/app.js";
 import { hashToken } from "../src/lib/tokens.js";
 
 const GUEST = { id: "g1", email: "tourist@example.com", name: null, lang: "en", emailVerifiedAt: null };
-const BIZ = { id: "b1", code: "abcd2345", name: "Konoba <Ribar>", publishedAt: new Date() };
+const BIZ = { id: "b1", code: "abcd2345", name: "Konoba <Ribar>", publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000) };
 
 async function call(method: "GET" | "POST" | "PATCH" | "PUT", url: string, payload?: object, cookie?: string) {
   const app = await buildApp();
@@ -157,7 +157,7 @@ describe("a signed-in guest", () => {
   });
 
   it("joins another business with one tap, only if it is published", async () => {
-    db.business.findUnique.mockResolvedValue({ id: "b2", publishedAt: new Date() });
+    db.business.findUnique.mockResolvedValue({ id: "b2", publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000) });
     const ok = await call("POST", "/guest/b/abcd2345/join", { marketingOptIn: true }, `guest=${await guestCookie()}`);
     expect(ok.statusCode).toBe(200);
     expect(db.membership.upsert.mock.calls[0]![0].create).toMatchObject({ guestId: "g1", businessId: "b2" });

@@ -4,6 +4,7 @@ import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
+import { liveWhere } from "../lib/live.js";
 import { boundingBox, distanceKm } from "../lib/geo.js";
 
 const MAX_RADIUS_KM = 50;
@@ -44,7 +45,7 @@ export async function partnerRoutes(app: FastifyInstance) {
     const box = boundingBox({ lat, lng }, radiusKm);
     const rows = await prisma.business.findMany({
       where: {
-        publishedAt: { not: null },
+        ...liveWhere(),
         approvedAt: { not: null },
         ...(kind ? { kind } : {}),
         lat: { gte: box.minLat, lte: box.maxLat },

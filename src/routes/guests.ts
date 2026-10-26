@@ -8,6 +8,7 @@ import { sendMail } from "../lib/mail.js";
 import { hashToken, newToken } from "../lib/tokens.js";
 import { verifyTurnstile } from "../lib/turnstile.js";
 import { UI_LANGS } from "../schemas.js";
+import { isLive } from "../lib/live.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 const LINK_TTL = 30 * 60 * 1000;
@@ -51,8 +52,8 @@ export async function guestRoutes(app: FastifyInstance) {
     },
   }, async (req, reply) => {
     if (!(await verifyTurnstile(req.body.turnstileToken, req.ip))) return reply.code(400).send({ error: "captcha_failed" });
-    const business = await prisma.business.findUnique({ where: { code: req.params.code }, select: { id: true, name: true, code: true, publishedAt: true } });
-    if (!business || !business.publishedAt) return reply.code(404).send({ error: "not_found" });
+    const business = await prisma.business.findUnique({ where: { code: req.params.code }, select: { id: true, name: true, code: true, publishedAt: true, paidUntil: true } });
+    if (!business || !isLive(business)) return reply.code(404).send({ error: "not_found" });
 
     const guest =
       (await prisma.guest.findUnique({ where: { email: req.body.email } })) ??
@@ -110,8 +111,8 @@ export async function guestRoutes(app: FastifyInstance) {
   // A guest who is already signed in joins another business with one tap: the address was proven when they signed in.
   r.post("/guest/b/:code/join", { preHandler: needGuest, schema: { params: z.object({ code }), body: z.object({ marketingOptIn: z.boolean().default(false) }).default({ marketingOptIn: false }) } }, async (req, reply) => {
     const g = guestFrom(req);
-    const business = await prisma.business.findUnique({ where: { code: req.params.code }, select: { id: true, publishedAt: true } });
-    if (!business || !business.publishedAt) return reply.code(404).send({ error: "not_found" });
+    const business = await prisma.business.findUnique({ where: { code: req.params.code }, select: { id: true, publishedAt: true, paidUntil: true } });
+    if (!business || !isLive(business)) return reply.code(404).send({ error: "not_found" });
     const now = new Date();
     await prisma.membership.upsert({
       where: { guestId_businessId: { guestId: g.id, businessId: business.id } },

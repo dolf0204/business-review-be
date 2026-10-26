@@ -15,6 +15,7 @@ import { campaignRoutes } from "./routes/campaigns.js";
 import { loyaltyRoutes } from "./routes/loyalty.js";
 import { uploadRoutes } from "./routes/uploads.js";
 import { expandMedia } from "./lib/media.js";
+import { billingRoutes, stripeWebhookRoutes } from "./routes/billing.js";
 import { postRoutes } from "./routes/posts.js";
 import { healthRoutes } from "./routes/health.js";
 import { publicRoutes } from "./routes/public.js";
@@ -95,6 +96,8 @@ export async function buildApp() {
   await app.register(campaignRoutes);
   await app.register(operatorRoutes);
   await app.register(uploadRoutes);
+  await app.register(billingRoutes);
+  await app.register(stripeWebhookRoutes);
   await app.register(partnerRoutes);
   await app.register(publicRoutes);
   return app;

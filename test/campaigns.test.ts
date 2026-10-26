@@ -18,7 +18,7 @@ import { runCampaign } from "../src/routes/campaigns.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const M1 = "22222222-2222-4222-8222-222222222222";
-const BIZ = { id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba <Ribar>", contactEmail: "info@konoba.hr", theme: { primary: "#112233" }, publishedAt: new Date() };
+const BIZ = { id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba <Ribar>", contactEmail: "info@konoba.hr", theme: { primary: "#112233" }, publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000) };
 const log = { info: vi.fn(), error: vi.fn() };
 
 describe("unsubscribe keys", () => {
