@@ -31,4 +31,9 @@ export async function sendMail(mail: Mail, log: { info: (o: object, m: string) =
     }),
   });
   if (!res.ok) throw new Error(`Brevo responded ${res.status}: ${await res.text()}`);
+  // Brevo accepting the request is not the same as the mail arriving: this id is what to look up under Transactional, Logs in Brevo.
+  const messageId = ((await res.json().catch(() => ({}))) as { messageId?: string }).messageId;
+  // While developing, the first link of the mail is logged too, so a mail that does not arrive does not block testing. Never in production: it holds a login token.
+  const link = config.NODE_ENV === "production" ? undefined : /href="([^"]+)"/.exec(mail.html)?.[1];
+  log.info({ toDomain: mail.to.split("@")[1], from: config.MAIL_FROM_EMAIL, messageId, ...(link ? { link } : {}) }, "mail accepted by Brevo");
 }
