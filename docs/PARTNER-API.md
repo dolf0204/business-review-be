@@ -13,9 +13,11 @@ x-api-key: <a key from PARTNER_API_KEYS>
 | `radiusKm` | 1 to 50, default 25. |
 | `kind` | Optional: restaurant, cafe, bar, beauty, shop, sport, sight, beach, other. |
 
-Answer: `{ "partners": [ { id, code, name, kind, tagline, offerText, address, lat, lng, distanceKm, imageUrl, rating, ratingCount, websiteUrl, googleMapsUrl, googleReviewUrl, pageUrl } ] }`,
+Answer: `{ "partners": [ { id, code, name, kind, tagline, offerText, address, lat, lng, distanceKm, imageUrl, rating, ratingCount, websiteUrl, googleMapsUrl, googleReviewUrl, coupons, pageUrl } ] }`,
 published businesses only, nearest first, at most 500. `401 unauthorized` without a valid key. `pageUrl` is the
 business's own page (`APP_URL/b/<code>`), where the guest registers and uses the loyalty card.
+
+`coupons` lists up to 3 coupons a guest can use now (`{ id, title, description, endsAt }`): switched on, inside their dates, and not used up. Using one needs a visit to `pageUrl`: the guest joins, and staff confirm it.
 
 Rules for the TouristAsk side: call it from the backend only (the key is a secret), cache the answer for about 10 minutes
 per guide, give it a short timeout, and show nothing when it fails.

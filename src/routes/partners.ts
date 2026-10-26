@@ -6,6 +6,7 @@ import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { liveWhere } from "../lib/live.js";
 import { boundingBox, distanceKm } from "../lib/geo.js";
+import { couponLeft, couponOpen, MAX_COUPONS_PER_BUSINESS } from "./coupons.js";
 
 const MAX_RADIUS_KM = 50;
 const DEFAULT_RADIUS_KM = 25;
@@ -22,6 +23,7 @@ export function isPartnerKey(given: string | undefined): boolean {
   });
 }
 
+const MAX_COUPONS_IN_FEED = 3;
 /**
  * The feed TouristAsk reads to show sponsors: published and approved businesses within a radius of a guide.
  * Server to server only: it needs a key from PARTNER_API_KEYS.
@@ -42,6 +44,7 @@ export async function partnerRoutes(app: FastifyInstance) {
   }, async (req, reply) => {
     if (!isPartnerKey(req.headers["x-api-key"] as string | undefined)) return reply.code(401).send({ error: "unauthorized" });
     const { lat, lng, radiusKm, kind } = req.query;
+    const now = new Date();
     const box = boundingBox({ lat, lng }, radiusKm);
     const rows = await prisma.business.findMany({
       where: {
@@ -52,6 +55,8 @@ export async function partnerRoutes(app: FastifyInstance) {
         lng: { gte: box.minLng, lte: box.maxLng },
       },
       take: MAX_RESULTS,
+      // Coupons are read with the businesses in one query; which of them are open now is decided below.
+      include: { coupons: { where: { active: true }, orderBy: { createdAt: "desc" }, take: MAX_COUPONS_PER_BUSINESS, include: { _count: { select: { uses: true } } } } },
     });
     const partners = rows
       .flatMap((b) => (b.lat === null || b.lng === null ? [] : [{ b, km: distanceKm({ lat, lng }, { lat: b.lat, lng: b.lng }) }]))
@@ -74,6 +79,11 @@ export async function partnerRoutes(app: FastifyInstance) {
         websiteUrl: b.websiteUrl,
         googleMapsUrl: b.googleMapsUrl,
         googleReviewUrl: b.googleReviewUrl,
+        // Coupons guests can use right now (inside their dates, places left), at most a few so a card stays short.
+        coupons: b.coupons
+          .filter((c) => couponOpen(c, now) && couponLeft(c.maxUses, c._count.uses) !== 0)
+          .slice(0, MAX_COUPONS_IN_FEED)
+          .map((c) => ({ id: c.id, title: c.title, description: c.description, endsAt: c.endsAt })),
         pageUrl: `${config.APP_URL}/b/${b.code}`,
       }));
     reply.header("cache-control", "no-store");
