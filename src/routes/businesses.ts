@@ -10,6 +10,8 @@ import { newCode, shareUrl } from "../lib/code.js";
 import { findPlaces, placeDetails, PlacesError } from "../lib/googlePlaces.js";
 import { mediaFilename } from "../lib/media.js";
 import { requestApproval, REVIEWED_FIELDS } from "../lib/review.js";
+import { stripeGuard } from "../lib/stripeGuard.js";
+import { cancelBilling } from "../lib/teardown.js";
 import { releaseUpload } from "./uploads.js";
 import { idParam, KINDS, profileSchema } from "../schemas.js";
 
@@ -62,7 +64,13 @@ export async function businessRoutes(app: FastifyInstance) {
   });
 
   r.delete("/businesses/:id", { ...auth, schema: { params: idParam } }, async (req, reply) => {
-    await prisma.business.deleteMany({ where: { id: req.params.id, ownerId: req.user.sub } });
+    const b = await ownedBusiness(req.user.sub, req.params.id);
+    if (!b) return reply.code(204).send();
+    // The subscription ends first: if Stripe cannot be reached nothing is deleted, so the owner is never charged for a page that is gone.
+    await stripeGuard(req, reply, () => cancelBilling([b.id]));
+    if (reply.sent) return reply;
+    await prisma.business.deleteMany({ where: { id: b.id, ownerId: req.user.sub } });
+    for (const url of [b.logoUrl, b.backgroundUrl]) await releaseUpload(req.user.sub, mediaFilename(url));
     return reply.code(204).send();
   });
 

@@ -7,6 +7,8 @@ import { prisma } from "../db.js";
 import type { TokenKind } from "../generated/prisma/enums.js";
 import { sendMail } from "../lib/mail.js";
 import { hashToken, newToken } from "../lib/tokens.js";
+import { stripeGuard } from "../lib/stripeGuard.js";
+import { cancelBilling, removeFiles } from "../lib/teardown.js";
 import { verifyTurnstile } from "../lib/turnstile.js";
 import { UI_LANGS } from "../schemas.js";
 
@@ -107,6 +109,21 @@ export async function authRoutes(app: FastifyInstance) {
     const userId = await consumeToken(req.body.token, "RESET_PASSWORD");
     if (!userId) return reply.code(400).send({ error: "invalid_or_expired_token" });
     await prisma.user.update({ where: { id: userId }, data: { passwordHash: await argon2.hash(req.body.password), emailVerifiedAt: new Date() } });
+    return { ok: true };
+  });
+
+  // Deletes the owner's account with every business, picture and subscription. The password is asked again, because a stolen session must not be enough.
+  r.delete("/auth/me", { ...strict, onRequest: [app.authenticate], schema: { body: z.object({ password: z.string().min(1).max(200) }) } }, async (req, reply) => {
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub }, select: { id: true, passwordHash: true } });
+    if (!user?.passwordHash || !(await argon2.verify(user.passwordHash, req.body.password))) return reply.code(401).send({ error: "invalid_credentials" });
+    const businesses = await prisma.business.findMany({ where: { ownerId: user.id }, select: { id: true } });
+    const uploads = await prisma.upload.findMany({ where: { ownerId: user.id }, select: { filename: true } });
+    // Subscriptions end first; if Stripe cannot be reached nothing is deleted.
+    await stripeGuard(req, reply, () => cancelBilling(businesses.map((b) => b.id)));
+    if (reply.sent) return reply;
+    await prisma.user.delete({ where: { id: user.id } });
+    await removeFiles(uploads.map((u) => u.filename));
+    reply.clearCookie("session", { path: "/" });
     return { ok: true };
   });
 
