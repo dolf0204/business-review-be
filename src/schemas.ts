@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { isRelativeMedia, toStoredImageUrl } from "./lib/media.js";
 
 export const KINDS = ["restaurant", "cafe", "bar", "beauty", "shop", "sport", "sight", "beach", "other"] as const;
 export const TEMPLATES = ["classic", "warm", "modern"] as const;
@@ -16,6 +17,12 @@ const siteUrl = (...hosts: string[]) =>
     const h = new URL(u).hostname.toLowerCase();
     return hosts.some((x) => h === x || h.endsWith(`.${x}`));
   });
+/** An http(s) address, or one of our own images as "/media/<id>.webp". Our own images are stored without an address. */
+const imageUrl = z
+  .string()
+  .max(2048)
+  .refine((v) => isRelativeMedia(v) || z.url({ protocol: /^https?$/ }).safeParse(v).success)
+  .transform(toStoredImageUrl);
 const optionalUrl = <T extends z.ZodType<string>>(schema: T) => z.union([z.literal("").transform(() => null), schema]);
 
 export const profileSchema = z
@@ -29,6 +36,8 @@ export const profileSchema = z
     instagramUrl: optionalUrl(siteUrl("instagram.com")),
     facebookUrl: optionalUrl(siteUrl("facebook.com", "fb.com")),
     tripadvisorReviewUrl: optionalUrl(siteUrl("tripadvisor.com", "tripadvisor.co.uk", "tripadvisor.de", "tripadvisor.it", "tripadvisor.fr", "tripadvisor.es", "tripadvisor.hr")),
+    logoUrl: z.union([z.literal("").transform(() => null), imageUrl]),
+    backgroundUrl: z.union([z.literal("").transform(() => null), imageUrl]),
     phone: text(40),
     contactEmail: z.union([z.literal("").transform(() => null), z.email().max(200)]),
     template: z.enum(TEMPLATES),

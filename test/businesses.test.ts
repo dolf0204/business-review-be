@@ -17,7 +17,7 @@ const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({
   id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba", kind: "restaurant", subtitle: null, offerText: null, address: null, lat: null, lng: null,
   googlePlaceId: null, googleMapsUrl: null, googleReviewUrl: null, tripadvisorReviewUrl: null, websiteUrl: null, instagramUrl: null, facebookUrl: null,
-  phone: null, contactEmail: null, imageUrl: null, rating: null, ratingCount: null, theme: {}, publishedAt: null, approvedAt: null, ...over,
+  phone: null, contactEmail: null, logoUrl: null, backgroundUrl: null, rating: null, ratingCount: null, theme: {}, publishedAt: null, approvedAt: null, ...over,
 });
 
 async function call(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, payload?: object) {

@@ -18,7 +18,7 @@ export async function publicRoutes(app: FastifyInstance) {
     // The latest five posts that have not ended.
     const posts = await prisma.post.findMany({ where: { businessId: b.id, OR: [{ endsAt: null }, { endsAt: { gte: now } }] }, orderBy: { createdAt: "desc" }, take: 5 });
     const loyalty = await prisma.loyaltyProgram.findUnique({ where: { businessId: b.id } });
-    reply.header("cache-control", "public, max-age=60");
+    reply.header("cache-control", "no-cache");
     return publicBusiness(b, posts, loyalty);
   });
 }

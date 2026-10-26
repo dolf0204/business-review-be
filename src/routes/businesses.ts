@@ -8,7 +8,9 @@ import { ownedBusiness } from "../lib/access.js";
 import { businessView, MAX_BUSINESSES_PER_OWNER, publishProblem } from "../lib/businessView.js";
 import { newCode, shareUrl } from "../lib/code.js";
 import { findPlaces, placeDetails, PlacesError } from "../lib/googlePlaces.js";
+import { mediaFilename } from "../lib/media.js";
 import { requestApproval, REVIEWED_FIELDS } from "../lib/review.js";
+import { releaseUpload } from "./uploads.js";
 import { idParam, KINDS, profileSchema } from "../schemas.js";
 
 const placesStatus = (e: PlacesError) => (e.code === "google_unavailable" ? 503 : e.code === "place_not_found" ? 404 : 422);
@@ -52,6 +54,10 @@ export async function businessRoutes(app: FastifyInstance) {
     const reopen = b.approvedAt !== null && reviewedChange;
     const updated = await prisma.business.update({ where: { id: b.id }, data: { ...fields, theme, ...(reopen ? { approvedAt: null } : {}) } });
     if (reopen && updated.publishedAt) await requestApproval(updated, true, req.log);
+    // An image that was replaced or removed is deleted, so storage does not fill up with unused pictures.
+    for (const key of ["logoUrl", "backgroundUrl"] as const) {
+      if (key in fields && b[key] && b[key] !== updated[key]) await releaseUpload(req.user.sub, mediaFilename(b[key]));
+    }
     return businessView(updated);
   });
 

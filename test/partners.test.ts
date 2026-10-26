@@ -8,7 +8,7 @@ import { buildApp } from "../src/app.js";
 const KEY = "partner-key-for-tests-0123456789abcdef";
 const biz = (over = {}) => ({
   id: "11111111-1111-4111-8111-111111111111", code: "abcd2345", name: "Konoba Ribar", kind: "restaurant", subtitle: "Best fish", offerText: "10% off",
-  address: "Obala 1, Zadar", lat: 44.12, lng: 15.23, imageUrl: null, rating: 4.7, ratingCount: 300, websiteUrl: null,
+  address: "Obala 1, Zadar", lat: 44.12, lng: 15.23, logoUrl: null, rating: 4.7, ratingCount: 300, websiteUrl: null,
   googleMapsUrl: null, googleReviewUrl: null, ...over,
 });
 

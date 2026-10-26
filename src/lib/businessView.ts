@@ -31,6 +31,8 @@ export function publicBusiness(b: Business, posts: { id: string; title: string; 
     address: b.address,
     lat: b.lat,
     lng: b.lng,
+    logoUrl: b.logoUrl,
+    backgroundUrl: b.backgroundUrl,
     rating: b.rating,
     ratingCount: b.ratingCount,
     googleMapsUrl: b.googleMapsUrl,

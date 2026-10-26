@@ -67,7 +67,7 @@ export async function partnerRoutes(app: FastifyInstance) {
         lat: b.lat,
         lng: b.lng,
         distanceKm: Math.round(km * 10) / 10,
-        imageUrl: b.imageUrl,
+        imageUrl: b.logoUrl,
         rating: b.rating,
         ratingCount: b.ratingCount,
         websiteUrl: b.websiteUrl,

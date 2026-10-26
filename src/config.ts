@@ -13,6 +13,8 @@ const schema = z.object({
   // Comma separated emails of the people who approve businesses before TouristAsk shows them. Empty = nobody is notified.
   OPERATOR_EMAILS: z.string().default(""),
   PARTNER_API_KEYS: z.string().default(""),
+  // Where uploaded images are kept. A persistent volume in production.
+  UPLOAD_DIR: z.string().default("uploads"),
   // Server key for the Places API (New), used to look a business up from its Google Maps link.
   GOOGLE_PLACES_API_KEY: z.string().default(""),
   // Cloudflare Turnstile secret for the guest forms. Empty is accepted outside production only.

@@ -67,6 +67,7 @@ All variables are validated in [`src/config.ts`](src/config.ts); a wrong value s
 | `JWT_SECRET`, `COOKIE_SECURE` | Session cookie `session` (secret at least 32 characters). |
 | `PARTNER_API_KEYS` | Comma separated keys for `GET /partners`. Empty = the feed is closed. |
 | `OPERATOR_EMAILS` | Comma separated emails that get a mail with approve and reject buttons when a business goes live or changes. Only approved businesses are in `GET /partners`. |
+| `UPLOAD_DIR` | Where logos and backgrounds are kept (default `uploads`). A persistent volume in production, backed up with the database. |
 | `GOOGLE_PLACES_API_KEY` | Places API (New) server key. |
 | `TURNSTILE_SECRET` | Cloudflare Turnstile secret for the guest forms. |
 | `BREVO_API_KEY`, `MAIL_FROM_EMAIL`, `MAIL_FROM_NAME` | Email. Empty key = emails are logged. |
@@ -110,6 +111,7 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Loyalty (slice 5) | Owner: `GET/PUT /businesses/:id/loyalty` (program and today's staff code). Guest: `GET /guest/b/:code/loyalty`, `POST .../loyalty/punch` (location or staff code), `POST .../loyalty/redeem` (staff code). The rule is shown to everyone in `GET /public/b/:code`. |
 | Offers by email (slice 6) | Owner: `GET/POST /businesses/:id/campaigns` (send to guests who agreed; one a week; answers 202 and sends in the background), `POST /businesses/:id/campaigns/test` (preview to the owner's address). Public: `POST /public/unsubscribe`, `POST /public/unsubscribe/:m/:t` (one-click) |
 | Operator (slice 7) | Mail with a link to `/operator/review`; `GET /public/operator/review?b&k`, `POST /public/operator/decision` (approve or reject, the key in the link is the proof) |
+| Pictures | `POST /uploads` (JPG, PNG or WebP up to 8 MB, re-encoded as WebP, metadata removed, 30 MB per owner), `GET /uploads/usage`, `GET /media/<id>.webp` (public). Logo and background are `logoUrl` and `backgroundUrl` of a business; a replaced picture is deleted. |
 | Partner feed | `GET /partners` with `x-api-key`, see [`docs/PARTNER-API.md`](docs/PARTNER-API.md) |
 
 Publishing needs a name and a connected Google place (that gives the position). The profile holds name, kind, subtitle, offer (max
@@ -122,7 +124,7 @@ API, see `docs/ACCOUNTS.md`). Before the feed goes live in TouristAsk we need ei
 ## Status
 
 Built: skeleton, config, schema (User, AuthToken, Business), auth, business profile, Google connection, publish, `GET /partners`;
-111 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
+116 tests. Not verified: anything against a real database, Google Places, Brevo or Turnstile (the sandbox has no access to them).
 
 ## Guests and privacy (slice 3)
 

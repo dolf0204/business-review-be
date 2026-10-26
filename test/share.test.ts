@@ -10,7 +10,7 @@ const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({
   id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba Ribar", kind: "restaurant", subtitle: "Fresh fish", offerText: "10% off", address: "Obala 1, Zadar",
   lat: 44.12, lng: 15.23, googlePlaceId: "ChIJ1", googleMapsUrl: "https://maps.google.com/?cid=1", googleReviewUrl: "https://g.page/r/x/review",
-  tripadvisorReviewUrl: null, websiteUrl: "https://k.example.com", instagramUrl: null, facebookUrl: null, phone: "023 1", contactEmail: null, imageUrl: null,
+  tripadvisorReviewUrl: null, websiteUrl: "https://k.example.com", instagramUrl: null, facebookUrl: null, phone: "023 1", contactEmail: null, logoUrl: null, backgroundUrl: null,
   rating: 4.7, ratingCount: 300, theme: { template: "warm" }, publishedAt: new Date(), ...over,
 });
 
@@ -79,7 +79,7 @@ describe("the guest page data", () => {
     const body = res.json();
     expect(body).toMatchObject({ name: "Konoba Ribar", offerText: "10% off", rating: 4.7, theme: { template: "warm", primary: "#0f766e", accent: "#f97316" } });
     for (const secret of ["ownerId", "id", "googlePlaceId", "googleReviewUrl", "publishedAt"]) expect(body[secret]).toBeUndefined();
-    expect(res.headers["cache-control"]).toContain("max-age=60");
+    expect(res.headers["cache-control"]).toBe("no-cache");
   });
 
   it("answers not found for an unknown or unpublished business", async () => {

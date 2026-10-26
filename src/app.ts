@@ -13,6 +13,8 @@ import { reviewRoutes } from "./routes/reviews.js";
 import { operatorRoutes } from "./routes/operator.js";
 import { campaignRoutes } from "./routes/campaigns.js";
 import { loyaltyRoutes } from "./routes/loyalty.js";
+import { uploadRoutes } from "./routes/uploads.js";
+import { expandMedia } from "./lib/media.js";
 import { postRoutes } from "./routes/posts.js";
 import { healthRoutes } from "./routes/health.js";
 import { publicRoutes } from "./routes/public.js";
@@ -66,6 +68,14 @@ export async function buildApp() {
   await app.register(rateLimit, { max: 200, timeWindow: "1 minute" });
   await app.register(jwt, { secret: config.JWT_SECRET, cookie: { cookieName: "session", signed: false } });
 
+  // Images are stored as "/media/<id>.webp". Every JSON answer gets the API address that is configured now, so moving the API never
+  // breaks an image.
+  app.addHook("onSend", async (_req, reply, payload) => {
+    if (typeof payload !== "string" || !payload.includes("/media/")) return payload;
+    if (!String(reply.getHeader("content-type") ?? "").includes("application/json")) return payload;
+    return expandMedia(payload);
+  });
+
   app.decorate("authenticate", async (req, reply) => {
     try {
       await req.jwtVerify({ onlyCookie: true });
@@ -84,6 +94,7 @@ export async function buildApp() {
   await app.register(loyaltyRoutes);
   await app.register(campaignRoutes);
   await app.register(operatorRoutes);
+  await app.register(uploadRoutes);
   await app.register(partnerRoutes);
   await app.register(publicRoutes);
   return app;
