@@ -4,6 +4,7 @@ const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn() },
   user: { findUnique: vi.fn() },
   campaign: { findMany: vi.fn(), findUnique: vi.fn(), count: vi.fn(), create: vi.fn(), update: vi.fn() },
+  campaignDelivery: { createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), update: vi.fn(), groupBy: vi.fn() },
   membership: { count: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
 }));
 vi.mock("../src/db.js", () => ({ prisma: db }));
@@ -14,7 +15,7 @@ import { buildApp } from "../src/app.js";
 import { config } from "../src/config.js";
 import { offerMailHtml } from "../src/lib/offerMail.js";
 import { isUnsubscribeKey, unsubscribeKey } from "../src/lib/unsubscribe.js";
-import { runCampaign } from "../src/routes/campaigns.js";
+import { createDeliveries, resumeCampaigns, runCampaign } from "../src/lib/campaignSend.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const M1 = "22222222-2222-4222-8222-222222222222";
@@ -52,20 +53,34 @@ describe("the offer email", () => {
   });
 });
 
+const GUEST = (email: string, lang = "en", over = {}) => ({ email, lang, emailVerifiedAt: new Date(), ...over });
+const delivery = (id: string, membership: object) => ({ id, membership });
+
 describe("sending a campaign", () => {
+  let waiting: object[][];
   beforeEach(() => {
     vi.clearAllMocks();
     mail.sendMail.mockResolvedValue(undefined);
-    db.campaign.findUnique.mockResolvedValue({ id: "c1", subject: "Happy hour", body: "Two for one." });
-    db.membership.findMany.mockResolvedValue([
-      { id: M1, guest: { email: "a@example.com", lang: "hr" } },
-      { id: "m2", guest: { email: "b@example.com", lang: "en" } },
-    ]);
+    db.campaign.findUnique.mockResolvedValue({ id: "c1", status: "SENDING", subject: "Happy hour", body: "Two for one." });
+    waiting = [[
+      delivery("d1", { id: M1, marketingOptInAt: new Date(), guest: GUEST("a@example.com", "hr") }),
+      delivery("d2", { id: "m2", marketingOptInAt: new Date(), guest: GUEST("b@example.com") }),
+    ], []];
+    db.campaignDelivery.findMany.mockImplementation(async () => waiting.shift() ?? []);
+    db.campaignDelivery.updateMany.mockResolvedValue({ count: 1 });
+    db.campaignDelivery.update.mockResolvedValue({});
+    db.campaignDelivery.groupBy.mockResolvedValue([{ status: "SENT", _count: { _all: 2 } }]);
   });
 
-  it("mails only guests who agreed and confirmed, each with their own unsubscribe link and the one-click header", async () => {
-    await runCampaign("c1", BIZ, log);
+  it("writes down who gets it: only guests who agreed and confirmed", async () => {
+    db.membership.findMany.mockResolvedValue([{ id: M1 }, { id: "m2" }]);
+    expect(await createDeliveries("c1", ID)).toBe(2);
     expect(db.membership.findMany.mock.calls[0]![0].where).toMatchObject({ businessId: ID, marketingOptInAt: { not: null }, guest: { emailVerifiedAt: { not: null } } });
+    expect(db.campaignDelivery.createMany.mock.calls[0]![0].data).toEqual([{ campaignId: "c1", membershipId: M1 }, { campaignId: "c1", membershipId: "m2" }]);
+  });
+
+  it("mails each guest with their own unsubscribe link and the one-click header, and marks it sent", async () => {
+    await runCampaign("c1", BIZ, log);
     expect(mail.sendMail).toHaveBeenCalledTimes(2);
     const first = mail.sendMail.mock.calls[0]![0];
     expect(first).toMatchObject({ to: "a@example.com", fromName: "Konoba <Ribar> via BusinessAsk", replyTo: "info@konoba.hr" });
@@ -73,15 +88,59 @@ describe("sending a campaign", () => {
     expect(first.html).toContain(`unsubscribe?m=${M1}&amp;t=${unsubscribeKey(M1, config.JWT_SECRET)}`);
     expect(first.headers["List-Unsubscribe"]).toContain(`/public/unsubscribe/${M1}/${unsubscribeKey(M1, config.JWT_SECRET)}`);
     expect(first.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
-    const final = db.campaign.update.mock.calls.at(-1)![0].data;
-    expect(final).toMatchObject({ status: "SENT", sentCount: 2, failedCount: 0 });
+    expect(db.campaignDelivery.update.mock.calls.map((c) => c[0].data.status)).toEqual(["SENT", "SENT"]);
+    expect(db.campaign.update.mock.calls.at(-1)![0].data).toMatchObject({ status: "SENT", sentCount: 2, failedCount: 0 });
   });
 
-  it("counts a failed address and keeps going", async () => {
+  it("marks a failed address and keeps going, without writing the address in the log", async () => {
     mail.sendMail.mockRejectedValueOnce(new Error("Brevo responded 400: secret detail")).mockResolvedValue(undefined);
     await runCampaign("c1", BIZ, log);
-    expect(db.campaign.update.mock.calls.at(-1)![0].data).toMatchObject({ status: "SENT", sentCount: 1, failedCount: 1 });
-    expect(JSON.stringify(log.error.mock.calls)).not.toContain("secret detail".replace("secret detail", "a@example.com"));
+    expect(db.campaignDelivery.update.mock.calls.map((c) => c[0].data.status).sort()).toEqual(["FAILED", "SENT"]);
+    expect(JSON.stringify(log.error.mock.calls)).not.toContain("a@example.com");
+  });
+
+  it("sends nothing to a guest who stopped the offers after the campaign was made", async () => {
+    waiting = [[delivery("d1", { id: M1, marketingOptInAt: null, guest: GUEST("a@example.com") })], []];
+    await runCampaign("c1", BIZ, log);
+    expect(mail.sendMail).not.toHaveBeenCalled();
+    expect(db.campaignDelivery.update.mock.calls[0]![0].data.status).toBe("SKIPPED");
+  });
+
+  it("does not send a mail another run has already claimed", async () => {
+    db.campaignDelivery.updateMany.mockResolvedValue({ count: 0 });
+    await runCampaign("c1", BIZ, log);
+    expect(mail.sendMail).not.toHaveBeenCalled();
+  });
+
+  it("does nothing for a campaign that is already finished", async () => {
+    db.campaign.findUnique.mockResolvedValue({ id: "c1", status: "SENT", subject: "x", body: "y" });
+    await runCampaign("c1", BIZ, log);
+    expect(db.campaignDelivery.findMany).not.toHaveBeenCalled();
+  });
+});
+
+describe("after a restart", () => {
+  const live = { id: ID, name: "Konoba", code: "abcd2345", contactEmail: null, theme: {}, publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000) };
+  beforeEach(() => {
+    vi.clearAllMocks();
+    db.campaignDelivery.updateMany.mockResolvedValue({ count: 0 });
+    db.campaignDelivery.findMany.mockResolvedValue([]);
+    db.campaignDelivery.groupBy.mockResolvedValue([]);
+    db.campaign.findUnique.mockResolvedValue({ id: "c1", status: "SENDING", subject: "x", body: "y" });
+  });
+
+  it("carries on with the mails that were waiting, and does not repeat one that was being sent", async () => {
+    db.campaign.findMany.mockResolvedValue([{ id: "c1", business: live }]);
+    await resumeCampaigns(log);
+    await vi.waitFor(() => expect(db.campaign.update).toHaveBeenCalled());
+    expect(db.campaignDelivery.updateMany.mock.calls[0]![0]).toEqual({ where: { campaignId: "c1", status: "SENDING" }, data: { status: "FAILED" } });
+    expect(db.campaign.update.mock.calls.at(-1)![0].data.status).toBe("SENT");
+  });
+
+  it("sends nothing more for a page that is no longer live", async () => {
+    db.campaign.findMany.mockResolvedValue([{ id: "c1", business: { ...live, publishedAt: null } }]);
+    await resumeCampaigns(log);
+    expect(db.campaignDelivery.updateMany.mock.calls[1]![0]).toEqual({ where: { campaignId: "c1", status: "PENDING" }, data: { status: "SKIPPED" } });
   });
 });
 
@@ -101,6 +160,7 @@ describe("the owner's campaign screen", () => {
     db.membership.count.mockResolvedValue(3);
     db.campaign.create.mockImplementation(async ({ data }: { data: object }) => ({ id: "c1", ...data }));
     db.campaign.findUnique.mockResolvedValue(null);
+    db.campaignDelivery.createMany.mockResolvedValue({ count: 3 });
   });
 
   it("accepts an offer, answers at once and counts the guests who agreed", async () => {

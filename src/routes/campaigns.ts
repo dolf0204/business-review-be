@@ -1,68 +1,18 @@
-import type { FastifyBaseLogger, FastifyInstance } from "fastify";
+import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { ownedBusiness } from "../lib/access.js";
+import { createDeliveries, fromName, MAX_RECIPIENTS, runCampaign, subjectOf } from "../lib/campaignSend.js";
 import { isLive } from "../lib/live.js";
 import { sendMail } from "../lib/mail.js";
 import { offerMailHtml } from "../lib/offerMail.js";
-import { isUnsubscribeKey, unsubscribeKey } from "../lib/unsubscribe.js";
+import { isUnsubscribeKey } from "../lib/unsubscribe.js";
 import { idParam } from "../schemas.js";
 
 export const MAX_CAMPAIGNS_PERIOD_DAYS = 7;
-export const MAX_RECIPIENTS = 1000;
-const PARALLEL = 5;
 const DAY = 24 * 60 * 60 * 1000;
-
-const subjectOf = (business: string, subject: string) => `${subject} · ${business}`;
-const fromName = (business: string) => `${business} via BusinessAsk`;
-
-/** The address in a mail's unsubscribe link, and in the one-click header that mail programs show as an "Unsubscribe" button. */
-const unsubscribeUrls = (membershipId: string) => {
-  const key = unsubscribeKey(membershipId, config.JWT_SECRET);
-  return { page: `${config.APP_URL}/unsubscribe?m=${membershipId}&t=${key}`, oneClick: `${config.PUBLIC_API_URL}/public/unsubscribe/${membershipId}/${key}` };
-};
-
-type Sender = { name: string; code: string; contactEmail: string | null; theme: unknown };
-
-/** Sends one campaign to the guests who agreed to receive offers and still have a confirmed address. Updates the counters as it goes. */
-export async function runCampaign(campaignId: string, business: Sender & { id: string }, log: Pick<FastifyBaseLogger, "info" | "error">) {
-  const campaign = await prisma.campaign.findUnique({ where: { id: campaignId } });
-  if (!campaign) return;
-  const members = await prisma.membership.findMany({
-    where: { businessId: business.id, marketingOptInAt: { not: null }, guest: { emailVerifiedAt: { not: null } } },
-    select: { id: true, guest: { select: { email: true, lang: true } } },
-    take: MAX_RECIPIENTS,
-  });
-  const color = (business.theme as { primary?: string } | null)?.primary;
-  let sent = 0;
-  let failed = 0;
-  for (let i = 0; i < members.length; i += PARALLEL) {
-    await Promise.all(
-      members.slice(i, i + PARALLEL).map(async (m) => {
-        const urls = unsubscribeUrls(m.id);
-        try {
-          await sendMail({
-            to: m.guest.email,
-            subject: subjectOf(business.name, campaign.subject),
-            html: offerMailHtml({ lang: m.guest.lang, businessName: business.name, subject: campaign.subject, body: campaign.body, pageUrl: `${config.APP_URL}/b/${business.code}?s=e`, unsubscribeUrl: urls.page, color }),
-            fromName: fromName(business.name),
-            replyTo: business.contactEmail ?? undefined,
-            headers: { "List-Unsubscribe": `<${urls.oneClick}>`, "List-Unsubscribe-Post": "List-Unsubscribe=One-Click" },
-          }, log);
-          sent++;
-        } catch (err) {
-          failed++;
-          log.error({ err: (err as Error).message, toDomain: m.guest.email.split("@")[1] }, "offer email could not be sent");
-        }
-      }),
-    );
-    await prisma.campaign.update({ where: { id: campaign.id }, data: { sentCount: sent, failedCount: failed } });
-  }
-  await prisma.campaign.update({ where: { id: campaign.id }, data: { status: "SENT", sentCount: sent, failedCount: failed, finishedAt: new Date() } });
-  log.info({ campaignId, sent, failed }, "campaign finished");
-}
 
 export async function campaignRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
@@ -105,7 +55,8 @@ export async function campaignRoutes(app: FastifyInstance) {
     const audience = await prisma.membership.count({ where: { businessId: b.id, marketingOptInAt: { not: null }, guest: { emailVerifiedAt: { not: null } } } });
     if (audience === 0) return reply.code(422).send({ error: "no_recipients" });
     const campaign = await prisma.campaign.create({ data: { businessId: b.id, subject: req.body.subject, body: req.body.body, recipients: Math.min(audience, MAX_RECIPIENTS) } });
-    // The mails go out after the answer, a few at a time; the owner sees the progress in the list.
+    // The list of who gets it is written down first, so a restart of the server cannot lose or repeat a mail. The mails go out after the answer.
+    await createDeliveries(campaign.id, b.id);
     void runCampaign(campaign.id, b, req.log).catch((err) => req.log.error({ err: (err as Error).message }, "campaign failed"));
     return reply.code(202).send(campaign);
   });

@@ -14,20 +14,20 @@ enum TokenKind {
 
 // A business owner (restaurant, cafe, bar, barber ...). Signs in to the business admin.
 model User {
-  id              String     @id @default(uuid()) @db.Uuid
-  email           String     @unique
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
   passwordHash    String?
   name            String?
-  uiLang          String     @default("en")
+  uiLang          String    @default("en")
   emailVerifiedAt DateTime?
-  createdAt       DateTime   @default(now())
-  updatedAt       DateTime   @updatedAt
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
 
-  businesses      Business[]
-  tokens          AuthToken[]
-  uploads         Upload[]
+  businesses       Business[]
+  tokens           AuthToken[]
+  uploads          Upload[]
   // The Stripe customer of this owner, created at the first checkout.
-  stripeCustomerId String? @unique
+  stripeCustomerId String?     @unique
 }
 
 // One-time links sent by email (confirm the address, reset the password). Only a hash is stored.
@@ -47,55 +47,55 @@ model AuthToken {
 
 // One venue. This table is the source of truth for sponsors: TouristAsk reads it through GET /partners.
 model Business {
-  id            String    @id @default(uuid()) @db.Uuid
-  ownerId       String    @db.Uuid
-  owner         User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  id                   String    @id @default(uuid()) @db.Uuid
+  ownerId              String    @db.Uuid
+  owner                User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   // Stable short code printed in the QR code and written on the NFC tag. Never changes.
-  code          String    @unique
-  name          String
+  code                 String    @unique
+  name                 String
   // The business kind, same values as TouristAsk sponsors: restaurant, cafe, bar, beauty, shop, sport, sight, beach, other.
-  kind          String    @default("restaurant")
-  subtitle      String?
+  kind                 String    @default("restaurant")
+  subtitle             String?
   // The headline offer shown to TouristAsk guests, for example "10% off for our guests".
-  offerText     String?
-  address       String?
-  lat           Float?
-  lng           Float?
-  googlePlaceId String?
-  googleMapsUrl String?
+  offerText            String?
+  address              String?
+  lat                  Float?
+  lng                  Float?
+  googlePlaceId        String?
+  googleMapsUrl        String?
   // Where guests are sent to review. Clicking counts as a review left.
   googleReviewUrl      String?
   tripadvisorReviewUrl String?
-  websiteUrl    String?
-  instagramUrl  String?
-  facebookUrl   String?
-  phone         String?
-  contactEmail  String?
+  websiteUrl           String?
+  instagramUrl         String?
+  facebookUrl          String?
+  phone                String?
+  contactEmail         String?
   // The logo (small, shown at the top of the page and in TouristAsk) and the picture behind the page header. Stored as /media/<id>.webp.
-  logoUrl       String?
-  backgroundUrl String?
+  logoUrl              String?
+  backgroundUrl        String?
   // Latest Google rating copied when the business is connected, shown on its card.
-  rating        Float?
-  ratingCount   Int?
-  theme         Json      @default("{}")
+  rating               Float?
+  ratingCount          Int?
+  theme                Json      @default("{}")
   // Only published businesses are visible to guests and to TouristAsk.
-  publishedAt   DateTime?
+  publishedAt          DateTime?
   // The operator has checked the page. Only approved businesses are given to TouristAsk as sponsors. Changing the name, offer or
   // Google place of an approved business clears this until it is checked again.
-  approvedAt    DateTime?
+  approvedAt           DateTime?
   // The subscription is paid up to this moment. Null or past: the page is not shown to guests. Copied from Stripe whenever it changes.
-  paidUntil     DateTime?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  paidUntil            DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
 
-  posts         Post[]
+  posts          Post[]
   loyaltyProgram LoyaltyProgram?
-  campaigns     Campaign[]
-  subscription  BusinessSubscription?
-  kitRequests   KitRequest[]
-  coupons       Coupon[]
-  memberships   Membership[]
-  guestTokens   GuestToken[]
+  campaigns      Campaign[]
+  subscription   BusinessSubscription?
+  kitRequests    KitRequest[]
+  coupons        Coupon[]
+  memberships    Membership[]
+  guestTokens    GuestToken[]
 
   @@index([ownerId])
   @@index([lat, lng])
@@ -103,31 +103,31 @@ model Business {
 
 // A visitor who joined a business by email. One account for all businesses, so the same person is recognised everywhere.
 model Guest {
-  id              String       @id @default(uuid()) @db.Uuid
-  email           String       @unique
+  id              String    @id @default(uuid()) @db.Uuid
+  email           String    @unique
   name            String?
-  lang            String       @default("en")
+  lang            String    @default("en")
   emailVerifiedAt DateTime?
-  createdAt       DateTime     @default(now())
+  createdAt       DateTime  @default(now())
 
-  tokens          GuestToken[]
-  memberships     Membership[]
+  tokens      GuestToken[]
+  memberships Membership[]
 }
 
 // The one-time sign-in link emailed to a guest. Only a hash is stored. It remembers which business the guest came from.
 model GuestToken {
-  id           String   @id @default(uuid()) @db.Uuid
-  guestId      String   @db.Uuid
-  businessId   String   @db.Uuid
-  tokenHash    String   @unique
+  id             String    @id @default(uuid()) @db.Uuid
+  guestId        String    @db.Uuid
+  businessId     String    @db.Uuid
+  tokenHash      String    @unique
   // The consent the guest ticked on the form; it is recorded only once the link is opened (the address is then proven).
-  marketingOptIn Boolean @default(false)
-  expiresAt    DateTime
-  usedAt       DateTime?
-  createdAt    DateTime @default(now())
+  marketingOptIn Boolean   @default(false)
+  expiresAt      DateTime
+  usedAt         DateTime?
+  createdAt      DateTime  @default(now())
 
-  guest        Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  business     Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  guest    Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([guestId, createdAt])
 }
@@ -141,17 +141,18 @@ model Membership {
   // Consent to receive this business's offers by email. Null means no consent (or withdrawn).
   marketingOptInAt DateTime?
 
-  guest            Guest     @relation(fields: [guestId], references: [id], onDelete: Cascade)
-  business         Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  guest    Guest    @relation(fields: [guestId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   // Days on which the guest opened the page (one count per day). Review prompts and the loyalty card build on this.
-  visits           Int       @default(0)
-  lastVisitAt      DateTime?
+  visits      Int       @default(0)
+  lastVisitAt DateTime?
 
-  reviewPrompts    ReviewPrompt[]
-  loyaltyCards     LoyaltyCard[]
-  loyaltyPunches   LoyaltyPunch[]
-  couponUses       CouponUse[]
+  reviewPrompts      ReviewPrompt[]
+  loyaltyCards       LoyaltyCard[]
+  loyaltyPunches     LoyaltyPunch[]
+  couponUses         CouponUse[]
+  campaignDeliveries CampaignDelivery[]
 
   @@unique([guestId, businessId])
   @@index([businessId])
@@ -163,7 +164,7 @@ enum ReviewPlatform {
 }
 
 enum ReviewPromptStatus {
-  DONE     // the guest followed the review link
+  DONE // the guest followed the review link
   DECLINED // the guest said no thanks; we ask again after a few more visits
 }
 
@@ -177,7 +178,7 @@ model ReviewPrompt {
   declinedAtVisit Int                @default(0)
   updatedAt       DateTime           @updatedAt
 
-  membership      Membership         @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   @@unique([membershipId, platform])
 }
@@ -192,13 +193,13 @@ model Post {
   endsAt     DateTime?
   createdAt  DateTime  @default(now())
 
-  business   Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, createdAt])
 }
 
 enum LoyaltyMethod {
-  LOCATION   // the guest's phone was near the business
+  LOCATION // the guest's phone was near the business
   STAFF_CODE // the guest typed the code staff showed them
 }
 
@@ -216,7 +217,7 @@ model LoyaltyProgram {
   radiusMeters Int       @default(150)
   updatedAt    DateTime  @updatedAt
 
-  business     Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 // One card of one guest. Goal and reward are copied when the card starts, so changing the program never changes a card in progress.
@@ -229,8 +230,8 @@ model LoyaltyCard {
   redeemedAt   DateTime?
   createdAt    DateTime  @default(now())
 
-  membership   Membership    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
-  punches      LoyaltyPunch[]
+  membership Membership     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  punches    LoyaltyPunch[]
 
   @@index([membershipId, createdAt])
 }
@@ -245,8 +246,8 @@ model LoyaltyPunch {
   distanceMeters Int?
   createdAt      DateTime      @default(now())
 
-  card           LoyaltyCard   @relation(fields: [cardId], references: [id], onDelete: Cascade)
-  membership     Membership    @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  card       LoyaltyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
+  membership Membership  @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   @@unique([membershipId, day])
   @@index([cardId])
@@ -270,9 +271,33 @@ model Campaign {
   createdAt   DateTime       @default(now())
   finishedAt  DateTime?
 
-  business    Business       @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business   Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  deliveries CampaignDelivery[]
 
   @@index([businessId, createdAt])
+}
+
+enum DeliveryStatus {
+  PENDING
+  SENDING
+  SENT
+  FAILED
+  SKIPPED
+}
+
+// One guest's mail of one campaign. The list is made when the campaign is created, so a restart of the server can pick up where it stopped
+// and no guest gets the same offer twice.
+model CampaignDelivery {
+  id           String         @id @default(uuid()) @db.Uuid
+  campaignId   String         @db.Uuid
+  membershipId String         @db.Uuid
+  status       DeliveryStatus @default(PENDING)
+
+  campaign   Campaign   @relation(fields: [campaignId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+
+  @@unique([campaignId, membershipId])
+  @@index([campaignId, status])
 }
 
 // An image an owner uploaded (logo, background). The file lives in UPLOAD_DIR; this row counts it against the owner's storage.
@@ -285,13 +310,13 @@ model Upload {
   height    Int
   createdAt DateTime @default(now())
 
-  owner     User     @relation(fields: [ownerId], references: [id], onDelete: Cascade)
+  owner User @relation(fields: [ownerId], references: [id], onDelete: Cascade)
 
   @@index([ownerId])
 }
 
 enum SubscriptionStatus {
-  ACTIVE   // paid, or in the free trial
+  ACTIVE // paid, or in the free trial
   PAST_DUE // the last payment failed; Stripe is still trying
   CANCELED
 }
@@ -313,7 +338,7 @@ model BusinessSubscription {
   createdAt            DateTime           @default(now())
   updatedAt            DateTime           @updatedAt
 
-  business             Business           @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
 
 enum KitStatus {
@@ -341,7 +366,7 @@ model KitRequest {
   createdAt   DateTime  @default(now())
   shippedAt   DateTime?
 
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 
   @@index([businessId, createdAt])
 }
@@ -358,21 +383,21 @@ model Coupon {
   active      Boolean   @default(true)
   createdAt   DateTime  @default(now())
 
-  business    Business  @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  uses        CouponUse[]
+  business Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  uses     CouponUse[]
 
   @@index([businessId, createdAt])
 }
 
 // A guest has used a coupon. The unique pair is what makes it once per guest, even if the button is tapped twice at once.
 model CouponUse {
-  id           String     @id @default(uuid()) @db.Uuid
-  couponId     String     @db.Uuid
-  membershipId String     @db.Uuid
-  createdAt    DateTime   @default(now())
+  id           String   @id @default(uuid()) @db.Uuid
+  couponId     String   @db.Uuid
+  membershipId String   @db.Uuid
+  createdAt    DateTime @default(now())
 
-  coupon       Coupon     @relation(fields: [couponId], references: [id], onDelete: Cascade)
-  membership   Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  coupon     Coupon     @relation(fields: [couponId], references: [id], onDelete: Cascade)
+  membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   @@unique([couponId, membershipId])
 }
