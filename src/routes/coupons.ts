@@ -20,6 +20,9 @@ type Window = { startsAt: Date | null; endsAt: Date | null; active: boolean };
 /** A coupon can be shown and used when it is switched on and inside its dates. */
 export const couponOpen = (c: Window, now = new Date()) => c.active && windowState(c.startsAt, c.endsAt, now) === "active";
 
+/** How many uses are left of a limited coupon; null when it has no limit. */
+export const couponLeft = (maxUses: number | null, used: number) => (maxUses === null ? null : Math.max(0, maxUses - used));
+
 export async function couponRoutes(app: FastifyInstance) {
   const r = app.withTypeProvider<ZodTypeProvider>();
   const auth = { onRequest: [app.authenticate] };
@@ -36,7 +39,7 @@ export async function couponRoutes(app: FastifyInstance) {
     };
   });
 
-  const body = z.object({ title: z.string().trim().min(1).max(60), description: text(200).optional(), startsAt: date, endsAt: date });
+  const body = z.object({ title: z.string().trim().min(1).max(60), description: text(200).optional(), startsAt: date, endsAt: date, maxUses: z.number().int().min(1).max(100_000).nullable().optional() });
 
   r.post("/businesses/:id/coupons", { ...auth, schema: { params: idParam, body } }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
@@ -44,7 +47,7 @@ export async function couponRoutes(app: FastifyInstance) {
     const { startsAt = null, endsAt = null } = req.body;
     if (startsAt && endsAt && endsAt <= startsAt) return reply.code(422).send({ error: "invalid_period" });
     if ((await prisma.coupon.count({ where: { businessId: b.id } })) >= MAX_COUPONS_PER_BUSINESS) return reply.code(422).send({ error: "coupon_limit_reached" });
-    return reply.code(201).send(await prisma.coupon.create({ data: { businessId: b.id, title: req.body.title, description: req.body.description ?? null, startsAt, endsAt } }));
+    return reply.code(201).send(await prisma.coupon.create({ data: { businessId: b.id, title: req.body.title, description: req.body.description ?? null, startsAt, endsAt, maxUses: req.body.maxUses ?? null } }));
   });
 
   r.patch("/coupons/:id", { ...auth, schema: { params: idParam, body: z.object({ active: z.boolean() }) } }, async (req, reply) => {
@@ -73,11 +76,11 @@ export async function couponRoutes(app: FastifyInstance) {
     const c = await context(req, req.params.code);
     if (!c.ok) return reply.code(c.status).send({ error: c.error });
     const [coupons, used] = await Promise.all([
-      prisma.coupon.findMany({ where: { businessId: c.business.id, active: true }, orderBy: { createdAt: "desc" } }),
+      prisma.coupon.findMany({ where: { businessId: c.business.id, active: true }, orderBy: { createdAt: "desc" }, include: { _count: { select: { uses: true } } } }),
       prisma.couponUse.findMany({ where: { membershipId: c.membership.id }, select: { couponId: true } }),
     ]);
     const usedIds = new Set(used.map((u) => u.couponId));
-    return { coupons: coupons.filter((x) => couponOpen(x)).map((x) => ({ id: x.id, title: x.title, description: x.description, startsAt: x.startsAt, endsAt: x.endsAt, used: usedIds.has(x.id) })) };
+    return { coupons: coupons.filter((x) => couponOpen(x)).map((x) => ({ id: x.id, title: x.title, description: x.description, startsAt: x.startsAt, endsAt: x.endsAt, used: usedIds.has(x.id), left: couponLeft(x.maxUses, x._count.uses) })) };
   });
 
   // Staff confirm a coupon by entering today's code on the guest's phone. One use per guest.
@@ -88,7 +91,16 @@ export async function couponRoutes(app: FastifyInstance) {
     const coupon = await prisma.coupon.findFirst({ where: { id: req.params.id, businessId: c.business.id } });
     if (!coupon || !couponOpen(coupon)) return reply.code(404).send({ error: "not_found" });
     try {
-      await prisma.couponUse.create({ data: { couponId: coupon.id, membershipId: c.membership.id } });
+      // The row of the coupon is locked while the places are counted, so two guests tapping at the same moment cannot take the last one twice.
+      const taken = await prisma.$transaction(async (tx) => {
+        if (coupon.maxUses !== null) {
+          await tx.$queryRaw`SELECT id FROM "Coupon" WHERE id = ${coupon.id}::uuid FOR UPDATE`;
+          if (couponLeft(coupon.maxUses, await tx.couponUse.count({ where: { couponId: coupon.id } })) === 0) return false;
+        }
+        await tx.couponUse.create({ data: { couponId: coupon.id, membershipId: c.membership.id } });
+        return true;
+      });
+      if (!taken) return reply.code(409).send({ error: "coupon_sold_out" });
     } catch (err) {
       if ((err as { code?: string }).code === "P2002") return reply.code(409).send({ error: "coupon_already_used" });
       throw err;

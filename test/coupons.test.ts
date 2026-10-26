@@ -5,7 +5,9 @@ const db = vi.hoisted(() => ({
   guest: { findUnique: vi.fn() },
   membership: { findUnique: vi.fn() },
   coupon: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), count: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn() },
-  couponUse: { findMany: vi.fn(), create: vi.fn() },
+  couponUse: { findMany: vi.fn(), create: vi.fn(), count: vi.fn() },
+  $queryRaw: vi.fn(),
+  $transaction: vi.fn(),
 }));
 vi.mock("../src/db.js", () => ({ prisma: db }));
 
@@ -62,6 +64,14 @@ describe("the owner's coupons", () => {
     expect((await owner("POST", `/businesses/${B}/coupons`, { title: "x".repeat(61) })).statusCode).toBe(400);
   });
 
+  it("stores an optional limit on how many guests may use a coupon", async () => {
+    expect((await owner("POST", `/businesses/${B}/coupons`, { title: "First 50", maxUses: 50 })).statusCode).toBe(201);
+    expect(db.coupon.create.mock.calls[0]![0].data.maxUses).toBe(50);
+    expect((await owner("POST", `/businesses/${B}/coupons`, { title: "No limit" })).statusCode).toBe(201);
+    expect(db.coupon.create.mock.calls[1]![0].data.maxUses).toBeNull();
+    for (const bad of [0, -3, 1.5, 100_001]) expect((await owner("POST", `/businesses/${B}/coupons`, { title: "x", maxUses: bad })).statusCode).toBe(400);
+  });
+
   it("switches a coupon off or deletes it only for its owner", async () => {
     db.coupon.updateMany.mockResolvedValue({ count: 1 });
     expect((await owner("PATCH", `/coupons/${C}`, { active: false })).statusCode).toBe(200);
@@ -81,7 +91,7 @@ describe("the owner's coupons", () => {
 
 describe("a guest and the coupons", () => {
   const BIZ = { id: B, publishedAt: new Date(), paidUntil: new Date(Date.now() + 30 * DAY) };
-  const coupon = (over = {}) => ({ id: C, businessId: B, title: "10% off lunch", description: null, startsAt: null, endsAt: null, active: true, ...over });
+  const coupon = (over = {}) => ({ id: C, businessId: B, title: "10% off lunch", description: null, startsAt: null, endsAt: null, active: true, maxUses: null, _count: { uses: 0 }, ...over });
   async function guest(method: "GET" | "POST", url: string, payload?: object, signedIn = true) {
     const app = await buildApp();
     const res = await app.inject({ method, url, payload, headers: signedIn ? { cookie: `guest=${app.jwt.sign({ sub: "g1", kind: "guest" } as never)}` } : {} });
@@ -97,12 +107,40 @@ describe("a guest and the coupons", () => {
     db.couponUse.findMany.mockResolvedValue([]);
     db.coupon.findFirst.mockResolvedValue(coupon());
     db.couponUse.create.mockResolvedValue({});
+    db.couponUse.count.mockResolvedValue(0);
+    db.$queryRaw.mockResolvedValue([]);
+    db.$transaction.mockImplementation(async (fn: (tx: typeof db) => Promise<unknown>) => fn(db));
   });
 
   it("lists the coupons that are open now and marks the ones this guest used", async () => {
     db.couponUse.findMany.mockResolvedValue([{ couponId: C }]);
     const res = await guest("GET", "/guest/b/abcd2345/coupons");
     expect(res.json().coupons).toEqual([expect.objectContaining({ id: C, title: "10% off lunch", used: true })]);
+  });
+
+  it("tells a member how many uses of a limited coupon are left", async () => {
+    db.coupon.findMany.mockResolvedValue([coupon({ maxUses: 50, _count: { uses: 48 } }), coupon({ id: "gone", maxUses: 5, _count: { uses: 9 } }), coupon({ id: "free" })]);
+    const left = Object.fromEntries((await guest("GET", "/guest/b/abcd2345/coupons")).json().coupons.map((c: { id: string; left: number | null }) => [c.id, c.left]));
+    expect(left).toEqual({ [C]: 2, gone: 0, free: null });
+  });
+
+  it("gives a limited coupon to guests only while places are left, counting under a lock", async () => {
+    db.coupon.findFirst.mockResolvedValue(coupon({ maxUses: 2 }));
+    db.couponUse.count.mockResolvedValue(1);
+    expect((await guest("POST", `/guest/b/abcd2345/coupons/${C}/use`, { staffCode: code() })).statusCode).toBe(200);
+    expect(db.$queryRaw).toHaveBeenCalledTimes(1);
+    db.couponUse.create.mockClear();
+    db.couponUse.count.mockResolvedValue(2);
+    const late = await guest("POST", `/guest/b/abcd2345/coupons/${C}/use`, { staffCode: code() });
+    expect(late.statusCode).toBe(409);
+    expect(late.json().error).toBe("coupon_sold_out");
+    expect(db.couponUse.create).not.toHaveBeenCalled();
+  });
+
+  it("does not count or lock a coupon without a limit", async () => {
+    expect((await guest("POST", `/guest/b/abcd2345/coupons/${C}/use`, { staffCode: code() })).statusCode).toBe(200);
+    expect(db.$queryRaw).not.toHaveBeenCalled();
+    expect(db.couponUse.count).not.toHaveBeenCalled();
   });
 
   it("needs a signed-in member of a live business", async () => {
