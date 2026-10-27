@@ -6,6 +6,7 @@ import { prisma } from "../db.js";
 import { ownedBusiness } from "../lib/access.js";
 import { isLive } from "../lib/live.js";
 import { isStaffCode, staffCode, utcDay, windowState } from "../lib/loyalty.js";
+import { reviewCoupon } from "../lib/review.js";
 import { idParam } from "../schemas.js";
 import { guestOf } from "./guests.js";
 
@@ -47,7 +48,8 @@ export async function couponRoutes(app: FastifyInstance) {
     const { startsAt = null, endsAt = null } = req.body;
     if (startsAt && endsAt && endsAt <= startsAt) return reply.code(422).send({ error: "invalid_period" });
     if ((await prisma.coupon.count({ where: { businessId: b.id } })) >= MAX_COUPONS_PER_BUSINESS) return reply.code(422).send({ error: "coupon_limit_reached" });
-    return reply.code(201).send(await prisma.coupon.create({ data: { businessId: b.id, title: req.body.title, description: req.body.description ?? null, startsAt, endsAt, maxUses: req.body.maxUses ?? null } }));
+    const created = await prisma.coupon.create({ data: { businessId: b.id, title: req.body.title, description: req.body.description ?? null, startsAt, endsAt, maxUses: req.body.maxUses ?? null } });
+    return reply.code(201).send(await reviewCoupon(created, b, req.log));
   });
 
   r.patch("/coupons/:id", { ...auth, schema: { params: idParam, body: z.object({ active: z.boolean() }) } }, async (req, reply) => {

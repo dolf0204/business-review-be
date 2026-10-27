@@ -7,7 +7,7 @@ import { prisma } from "../db.js";
 import { liveWhere } from "../lib/live.js";
 import { boundingBox, distanceKm } from "../lib/geo.js";
 import { kindsShownAs, partnerKind } from "../lib/partnerKinds.js";
-import { couponOpen, MAX_COUPONS_PER_BUSINESS } from "./coupons.js";
+import { couponLeft, couponOpen, MAX_COUPONS_PER_BUSINESS } from "./coupons.js";
 
 const MAX_RADIUS_KM = 50;
 const DEFAULT_RADIUS_KM = 25;
@@ -57,7 +57,7 @@ export async function partnerRoutes(app: FastifyInstance) {
       },
       take: MAX_RESULTS,
       // Coupons are read with the businesses in one query; which of them are open now is decided below.
-      include: { coupons: { where: { active: true }, orderBy: { createdAt: "desc" }, take: MAX_COUPONS_PER_BUSINESS } },
+      include: { coupons: { where: { active: true, clearedAt: { not: null } }, orderBy: { createdAt: "desc" }, take: MAX_COUPONS_PER_BUSINESS, include: { _count: { select: { uses: true } } } } },
     });
     const partners = rows
       .flatMap((b) => (b.lat === null || b.lng === null ? [] : [{ b, km: distanceKm({ lat, lng }, { lat: b.lat, lng: b.lng }) }]))
@@ -82,7 +82,7 @@ export async function partnerRoutes(app: FastifyInstance) {
         googleReviewUrl: b.googleReviewUrl,
         // Coupons that are switched on and inside their dates; one that has expired is not sent. At most a few, so a card stays short.
         coupons: b.coupons
-          .filter((c) => couponOpen(c, now))
+          .filter((c) => couponOpen(c, now) && couponLeft(c.maxUses, c._count.uses) !== 0)
           .slice(0, MAX_COUPONS_IN_FEED)
           .map((c) => ({ id: c.id, title: c.title, description: c.description, endsAt: c.endsAt })),
         pageUrl: `${config.APP_URL}/b/${b.code}`,

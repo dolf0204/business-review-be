@@ -383,6 +383,7 @@ model Coupon {
   active      Boolean   @default(true)
   // How many guests may use it in all, for example the first 50. Null means no limit.
   maxUses     Int?
+  clearedAt   DateTime?
   createdAt   DateTime  @default(now())
 
   business Business    @relation(fields: [businessId], references: [id], onDelete: Cascade)
