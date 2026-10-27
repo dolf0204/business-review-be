@@ -6,7 +6,8 @@ import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { liveWhere } from "../lib/live.js";
 import { boundingBox, distanceKm } from "../lib/geo.js";
-import { couponLeft, couponOpen, MAX_COUPONS_PER_BUSINESS } from "./coupons.js";
+import { kindsShownAs, partnerKind } from "../lib/partnerKinds.js";
+import { couponOpen, MAX_COUPONS_PER_BUSINESS } from "./coupons.js";
 
 const MAX_RADIUS_KM = 50;
 const DEFAULT_RADIUS_KM = 25;
@@ -50,13 +51,13 @@ export async function partnerRoutes(app: FastifyInstance) {
       where: {
         ...liveWhere(),
         approvedAt: { not: null },
-        ...(kind ? { kind } : {}),
+        ...(kind ? { kind: { in: kindsShownAs(kind) } } : {}),
         lat: { gte: box.minLat, lte: box.maxLat },
         lng: { gte: box.minLng, lte: box.maxLng },
       },
       take: MAX_RESULTS,
       // Coupons are read with the businesses in one query; which of them are open now is decided below.
-      include: { coupons: { where: { active: true }, orderBy: { createdAt: "desc" }, take: MAX_COUPONS_PER_BUSINESS, include: { _count: { select: { uses: true } } } } },
+      include: { coupons: { where: { active: true }, orderBy: { createdAt: "desc" }, take: MAX_COUPONS_PER_BUSINESS } },
     });
     const partners = rows
       .flatMap((b) => (b.lat === null || b.lng === null ? [] : [{ b, km: distanceKm({ lat, lng }, { lat: b.lat, lng: b.lng }) }]))
@@ -66,7 +67,7 @@ export async function partnerRoutes(app: FastifyInstance) {
         id: b.id,
         code: b.code,
         name: b.name,
-        kind: b.kind,
+        kind: partnerKind(b.kind),
         tagline: b.subtitle,
         offerText: b.offerText,
         address: b.address,
@@ -79,9 +80,9 @@ export async function partnerRoutes(app: FastifyInstance) {
         websiteUrl: b.websiteUrl,
         googleMapsUrl: b.googleMapsUrl,
         googleReviewUrl: b.googleReviewUrl,
-        // Coupons guests can use right now (inside their dates, places left), at most a few so a card stays short.
+        // Coupons that are switched on and inside their dates; one that has expired is not sent. At most a few, so a card stays short.
         coupons: b.coupons
-          .filter((c) => couponOpen(c, now) && couponLeft(c.maxUses, c._count.uses) !== 0)
+          .filter((c) => couponOpen(c, now))
           .slice(0, MAX_COUPONS_IN_FEED)
           .map((c) => ({ id: c.id, title: c.title, description: c.description, endsAt: c.endsAt })),
         pageUrl: `${config.APP_URL}/b/${b.code}`,

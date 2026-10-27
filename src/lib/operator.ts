@@ -23,6 +23,7 @@ export interface ReviewMailInput {
   ownerEmail: string;
   link: string;
   changed: boolean;
+  note?: string;
 }
 
 /** The mail that asks the operator to look at a business before TouristAsk shows it. Everything the owner typed is escaped. */
@@ -35,7 +36,7 @@ export function reviewMail(i: ReviewMailInput) {
 <li>Address: ${esc(i.address ?? "(none)")}</li>
 <li>Google page: ${i.googleMapsUrl ? `<a href="${esc(i.googleMapsUrl)}">open</a>` : "(none)"}</li>
 <li>Owner: ${esc(i.ownerEmail)}</li>
-</ul>
+${i.note ? `<li>Automatic check: ${esc(i.note)}</li>\n` : ""}</ul>
 <p>Check that the offer belongs to this business and is fine to show to tourists, then decide:</p>
 <p><a href="${esc(i.link)}">Review and decide</a></p>`,
   };

@@ -12,6 +12,9 @@ const schema = z.object({
   // Comma separated keys the TouristAsk backend sends as x-api-key to read GET /partners. Empty = the feed is closed.
   // Comma separated emails of the people who approve businesses before TouristAsk shows them. Empty = nobody is notified.
   OPERATOR_EMAILS: z.string().default(""),
+  // Anthropic key for the automatic check of new businesses. Empty = every business goes to the operators as before.
+  ANTHROPIC_API_KEY: z.string().default(""),
+  APPROVAL_MODEL: z.string().default("claude-haiku-5-5"),
   PARTNER_API_KEYS: z.string().default(""),
   // Stripe. Empty key = billing answers 503 and nobody can publish.
   STRIPE_SECRET_KEY: z.string().default(""),

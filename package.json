@@ -7,7 +7,9 @@
     "node": ">=22"
   },
   "scripts": {
+    "predev": "prisma generate && prisma migrate deploy",
     "dev": "tsx watch --env-file-if-exists=.env.dev src/server.ts",
+    "prestage": "prisma generate && prisma migrate deploy",
     "stage": "tsx watch --env-file-if-exists=.env.stage src/server.ts",
     "build": "tsc -p tsconfig.json",
     "start": "node --env-file-if-exists=.env dist/server.js",

@@ -9,7 +9,7 @@ import { businessView, MAX_BUSINESSES_PER_OWNER, publishProblem } from "../lib/b
 import { newCode, shareUrl } from "../lib/code.js";
 import { findPlaces, placeDetails, PlacesError } from "../lib/googlePlaces.js";
 import { mediaFilename } from "../lib/media.js";
-import { requestApproval, REVIEWED_FIELDS } from "../lib/review.js";
+import { REVIEWED_FIELDS, reviewBusiness } from "../lib/review.js";
 import { stripeGuard } from "../lib/stripeGuard.js";
 import { cancelBilling } from "../lib/teardown.js";
 import { releaseUpload } from "./uploads.js";
@@ -55,12 +55,12 @@ export async function businessRoutes(app: FastifyInstance) {
     const reviewedChange = REVIEWED_FIELDS.some((k) => k in fields && (fields as Record<string, unknown>)[k] !== b[k]);
     const reopen = b.approvedAt !== null && reviewedChange;
     const updated = await prisma.business.update({ where: { id: b.id }, data: { ...fields, theme, ...(reopen ? { approvedAt: null } : {}) } });
-    if (reopen && updated.publishedAt) await requestApproval(updated, true, req.log);
+    const current = reopen && updated.publishedAt ? await reviewBusiness(updated, true, req.log) : updated;
     // An image that was replaced or removed is deleted, so storage does not fill up with unused pictures.
     for (const key of ["logoUrl", "backgroundUrl"] as const) {
       if (key in fields && b[key] && b[key] !== updated[key]) await releaseUpload(req.user.sub, mediaFilename(b[key]));
     }
-    return businessView(updated);
+    return businessView(current);
   });
 
   r.delete("/businesses/:id", { ...auth, schema: { params: idParam } }, async (req, reply) => {
@@ -83,8 +83,8 @@ export async function businessRoutes(app: FastifyInstance) {
     if (!b.paidUntil || b.paidUntil <= new Date()) return reply.code(402).send({ error: "payment_required" });
     const updated = await prisma.business.update({ where: { id: b.id }, data: { publishedAt: b.publishedAt ?? new Date() } });
     // The first time a business goes live (and is not yet approved), the operator is asked to look at it.
-    if (!b.publishedAt && !updated.approvedAt) await requestApproval(updated, false, req.log);
-    return businessView(updated);
+    const current = !b.publishedAt && !updated.approvedAt ? await reviewBusiness(updated, false, req.log) : updated;
+    return businessView(current);
   });
 
   r.post("/businesses/:id/unpublish", { ...auth, schema: { params: idParam } }, async (req, reply) => {
@@ -154,8 +154,8 @@ export async function businessRoutes(app: FastifyInstance) {
           ...(b.approvedAt !== null && b.googlePlaceId !== p.placeId ? { approvedAt: null } : {}),
         },
       });
-      if (b.approvedAt !== null && b.googlePlaceId !== p.placeId && updated.publishedAt) await requestApproval(updated, true, req.log);
-      return businessView(updated);
+      const current = b.approvedAt !== null && b.googlePlaceId !== p.placeId && updated.publishedAt ? await reviewBusiness(updated, true, req.log) : updated;
+      return businessView(current);
     } catch (err) {
       if (err instanceof PlacesError) return reply.code(placesStatus(err)).send({ error: err.code });
       throw err;
