@@ -13,10 +13,11 @@ vi.mock("../src/db.js", () => ({ prisma: db }));
 
 import { buildApp } from "../src/app.js";
 import { config } from "../src/config.js";
-import { isNearEnough, isStaffCode, staffCode, utcDay, windowState } from "../src/lib/loyalty.js";
+import { cardExpired, cardExpiry, isNearEnough, isStaffCode, staffCode, utcDay, windowState } from "../src/lib/loyalty.js";
 
 const B = "11111111-1111-4111-8111-111111111111";
 const TODAY = utcDay(new Date());
+const DAY_MS = 86_400_000;
 
 describe("loyalty rules", () => {
   it("makes a six digit code that differs per business and per day, and checks it", () => {
@@ -44,6 +45,22 @@ describe("loyalty rules", () => {
     expect(windowState(null, new Date("2026-04-01T00:00:00Z"), now)).toBe("ended");
     expect(windowState(null, null, now)).toBe("active");
   });
+
+  it("gives a card an end only when the program limits how long a card lasts", () => {
+    const from = new Date("2026-04-01T10:00:00Z");
+    expect(cardExpiry(null, from)).toBeNull();
+    expect(cardExpiry(30, from)).toEqual(new Date("2026-05-01T10:00:00Z"));
+  });
+
+  it("runs out an unfinished card after its end, never a finished one", () => {
+    const now = new Date("2026-04-10T12:00:00Z");
+    const before = new Date("2026-04-09T12:00:00Z");
+    const after = new Date("2026-04-11T12:00:00Z");
+    expect(cardExpired({ completedAt: null, expiresAt: before }, now)).toBe(true);
+    expect(cardExpired({ completedAt: null, expiresAt: after }, now)).toBe(false);
+    expect(cardExpired({ completedAt: null, expiresAt: null }, now)).toBe(false);
+    expect(cardExpired({ completedAt: new Date(), expiresAt: before }, now)).toBe(false);
+  });
 });
 
 describe("setting up the program", () => {
@@ -62,7 +79,7 @@ describe("setting up the program", () => {
   it("shows a blank program and today's staff code", async () => {
     db.loyaltyProgram.findUnique.mockResolvedValue(null);
     const res = await owner("GET");
-    expect(res.json().program).toMatchObject({ enabled: false, goal: 10, radiusMeters: 150 });
+    expect(res.json().program).toMatchObject({ enabled: false, goal: 10, cardValidDays: null, radiusMeters: 150 });
     expect(res.json().staffCode).toBe(staffCode(B, TODAY, config.JWT_SECRET));
   });
 
@@ -77,6 +94,18 @@ describe("setting up the program", () => {
     expect((await owner("PUT", { enabled: false, goal: 5, rewardText: "x" })).statusCode).toBe(200);
   });
 
+  it("saves how many days a card lasts, clears it with null, leaves it alone when missing, and refuses 0 or more than 730", async () => {
+    const rule = { enabled: true, goal: 5, rewardText: "x" };
+    await owner("PUT", { ...rule, cardValidDays: 90 });
+    expect(db.loyaltyProgram.upsert.mock.calls[0]![0].create).toMatchObject({ cardValidDays: 90 });
+    await owner("PUT", { ...rule, cardValidDays: null });
+    expect(db.loyaltyProgram.upsert.mock.calls[1]![0].update).toMatchObject({ cardValidDays: null });
+    await owner("PUT", rule);
+    expect(db.loyaltyProgram.upsert.mock.calls[2]![0].update).not.toHaveProperty("cardValidDays");
+    expect((await owner("PUT", { ...rule, cardValidDays: 0 })).statusCode).toBe(400);
+    expect((await owner("PUT", { ...rule, cardValidDays: 731 })).statusCode).toBe(400);
+  });
+
   it("keeps other owners out", async () => {
     db.business.findFirst.mockResolvedValue(null);
     expect((await owner("GET")).statusCode).toBe(404);
@@ -84,9 +113,9 @@ describe("setting up the program", () => {
 });
 
 describe("stamps", () => {
-  const PROGRAM = { enabled: true, goal: 3, rewardText: "Free meal", startsAt: null, endsAt: null, radiusMeters: 150 };
+  const PROGRAM = { enabled: true, goal: 3, rewardText: "Free meal", startsAt: null, endsAt: null, cardValidDays: null, radiusMeters: 150 };
   const BIZ = { id: B, publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), lat: 44.12, lng: 15.23, loyaltyProgram: PROGRAM };
-  const card = (punches: number, over = {}) => ({ id: "c1", membershipId: "m1", goal: 3, rewardText: "Free meal", completedAt: null, redeemedAt: null, _count: { punches }, ...over });
+  const card = (punches: number, over = {}) => ({ id: "c1", membershipId: "m1", goal: 3, rewardText: "Free meal", completedAt: null, redeemedAt: null, expiresAt: null, _count: { punches }, ...over });
 
   async function call(url: string, payload?: object, signedIn = true) {
     const app = await buildApp();
@@ -128,6 +157,52 @@ describe("stamps", () => {
     db.loyaltyCard.create.mockResolvedValue(card(0));
     await call("/guest/b/abcd2345/loyalty/punch", HERE);
     expect(db.loyaltyCard.create.mock.calls[0]![0].data).toMatchObject({ membershipId: "m1", goal: 3, rewardText: "Free meal" });
+  });
+
+  it("starts a card that ends after the program's number of days", async () => {
+    db.business.findUnique.mockResolvedValue({ ...BIZ, loyaltyProgram: { ...PROGRAM, cardValidDays: 30 } });
+    db.loyaltyCard.findFirst.mockResolvedValue(null);
+    db.loyaltyCard.create.mockResolvedValue(card(0));
+    const before = Date.now();
+    await call("/guest/b/abcd2345/loyalty/punch", HERE);
+    const expiresAt = db.loyaltyCard.create.mock.calls[0]![0].data.expiresAt as Date;
+    expect(expiresAt.getTime()).toBeGreaterThanOrEqual(before + 30 * DAY_MS);
+    expect(expiresAt.getTime()).toBeLessThanOrEqual(Date.now() + 30 * DAY_MS);
+  });
+
+  it("starts a card without an end when the program has no limit", async () => {
+    db.loyaltyCard.findFirst.mockResolvedValue(null);
+    db.loyaltyCard.create.mockResolvedValue(card(0));
+    await call("/guest/b/abcd2345/loyalty/punch", HERE);
+    expect(db.loyaltyCard.create.mock.calls[0]![0].data.expiresAt).toBeNull();
+  });
+
+  it("starts a new card when the one in progress has run out", async () => {
+    db.loyaltyCard.findFirst.mockResolvedValue(card(2, { expiresAt: new Date(Date.now() - 1000) }));
+    db.loyaltyCard.create.mockResolvedValue(card(0, { id: "c2" }));
+    const res = await call("/guest/b/abcd2345/loyalty/punch", HERE);
+    expect(res.statusCode).toBe(200);
+    expect(db.loyaltyCard.create).toHaveBeenCalledTimes(1);
+    expect(db.loyaltyPunch.create.mock.calls[0]![0].data.cardId).toBe("c2");
+  });
+
+  it("shows no card when the one in progress has run out", async () => {
+    db.loyaltyCard.findFirst.mockResolvedValue(card(2, { expiresAt: new Date(Date.now() - 1000) }));
+    expect((await call("/guest/b/abcd2345/loyalty")).json().card).toBeNull();
+  });
+
+  it("tells the guest how long a card lasts and when the current one ends", async () => {
+    const expiresAt = new Date(Date.now() + 5 * DAY_MS);
+    db.business.findUnique.mockResolvedValue({ ...BIZ, loyaltyProgram: { ...PROGRAM, cardValidDays: 30 } });
+    db.loyaltyCard.findFirst.mockResolvedValue(card(1, { expiresAt }));
+    const res = await call("/guest/b/abcd2345/loyalty");
+    expect(res.json().program.cardValidDays).toBe(30);
+    expect(res.json().card.expiresAt).toBe(expiresAt.toISOString());
+  });
+
+  it("does not run out a full card", async () => {
+    db.loyaltyCard.findFirst.mockResolvedValue(card(3, { completedAt: new Date(), expiresAt: new Date(Date.now() - 1000) }));
+    expect((await call("/guest/b/abcd2345/loyalty/punch", HERE)).json().error).toBe("card_complete");
   });
 
   it("refuses a guest who is far away, and one who gave no proof", async () => {

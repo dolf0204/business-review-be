@@ -18,7 +18,7 @@ export function publishProblem(b: Pick<Business, "name" | "googlePlaceId" | "lat
 const DEFAULT_THEME = { template: "classic", primary: "#0f766e", accent: "#f97316" };
 
 /** What a guest receives about a published business: the page content, nothing about the owner or the account. */
-type LoyaltyTeaser = { enabled: boolean; goal: number; rewardText: string; startsAt: Date | null; endsAt: Date | null } | null;
+type LoyaltyTeaser = { enabled: boolean; goal: number; rewardText: string; startsAt: Date | null; endsAt: Date | null; cardValidDays: number | null } | null;
 
 type PublicCoupon = { id: string; title: string; description: string | null; startsAt: Date | null; endsAt: Date | null };
 
@@ -44,7 +44,7 @@ export function publicBusiness(b: Business, posts: { id: string; title: string; 
     phone: b.phone,
     contactEmail: b.contactEmail,
     theme: { template: theme.template, primary: theme.primary, accent: theme.accent },
-    loyalty: loyalty?.enabled ? { goal: loyalty.goal, rewardText: loyalty.rewardText, startsAt: loyalty.startsAt, endsAt: loyalty.endsAt } : null,
+    loyalty: loyalty?.enabled ? { goal: loyalty.goal, rewardText: loyalty.rewardText, startsAt: loyalty.startsAt, endsAt: loyalty.endsAt, cardValidDays: loyalty.cardValidDays } : null,
     coupons: coupons.map((c) => ({ id: c.id, title: c.title, description: c.description, startsAt: c.startsAt, endsAt: c.endsAt })),
     posts: posts.map((p) => ({ id: p.id, title: p.title, body: p.body, endsAt: p.endsAt, createdAt: p.createdAt })),
   };

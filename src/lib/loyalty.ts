@@ -5,6 +5,9 @@ export const DEFAULT_RADIUS_METERS = 150;
 // Phone positions indoors are off by tens of metres; the reported accuracy is allowed for, but only up to this much.
 const MAX_ACCURACY_BONUS_METERS = 100;
 
+const DAY_MS = 86_400_000;
+export const MAX_CARD_VALID_DAYS = 730;
+
 export const utcDay = (d: Date) => d.toISOString().slice(0, 10);
 
 export type WindowState = "upcoming" | "active" | "ended";
@@ -14,6 +17,14 @@ export function windowState(startsAt: Date | null, endsAt: Date | null, now: Dat
   if (startsAt && now < startsAt) return "upcoming";
   if (endsAt && now > endsAt) return "ended";
   return "active";
+}
+
+export function cardExpiry(validDays: number | null, from: Date): Date | null {
+  return validDays ? new Date(from.getTime() + validDays * DAY_MS) : null;
+}
+
+export function cardExpired(card: { completedAt: Date | null; expiresAt: Date | null }, now: Date): boolean {
+  return card.completedAt === null && card.expiresAt !== null && now > card.expiresAt;
 }
 
 export function distanceMeters(a: { lat: number; lng: number }, b: { lat: number; lng: number }) {

@@ -4,7 +4,7 @@ import { z } from "zod";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { ownedBusiness } from "../lib/access.js";
-import { DEFAULT_RADIUS_METERS, distanceMeters, isNearEnough, isStaffCode, staffCode, utcDay, windowState } from "../lib/loyalty.js";
+import { cardExpired, cardExpiry, DEFAULT_RADIUS_METERS, distanceMeters, isNearEnough, isStaffCode, MAX_CARD_VALID_DAYS, staffCode, utcDay, windowState } from "../lib/loyalty.js";
 import { idParam } from "../schemas.js";
 import { guestOf } from "./guests.js";
 import { isLive } from "../lib/live.js";
@@ -25,7 +25,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     if (!b) return reply.code(404).send({ error: "not_found" });
     const program = await prisma.loyaltyProgram.findUnique({ where: { businessId: b.id } });
     return {
-      program: program ?? { enabled: false, goal: 10, rewardText: "", startsAt: null, endsAt: null, radiusMeters: DEFAULT_RADIUS_METERS },
+      program: program ?? { enabled: false, goal: 10, rewardText: "", startsAt: null, endsAt: null, cardValidDays: null, radiusMeters: DEFAULT_RADIUS_METERS },
       // The code staff show to guests who cannot share a location, and enter to redeem a reward. It changes every day.
       staffCode: staffCode(b.id, today(), config.JWT_SECRET),
     };
@@ -35,7 +35,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
     ...auth,
     schema: {
       params: idParam,
-      body: z.object({ enabled: z.boolean(), goal: z.number().int().min(2).max(50), rewardText: z.string().trim().min(1).max(100), startsAt: date, endsAt: date }),
+      body: z.object({ enabled: z.boolean(), goal: z.number().int().min(2).max(50), rewardText: z.string().trim().min(1).max(100), startsAt: date, endsAt: date, cardValidDays: z.number().int().min(1).max(MAX_CARD_VALID_DAYS).nullable().optional() }),
     },
   }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
@@ -62,12 +62,18 @@ export async function loyaltyRoutes(app: FastifyInstance) {
   const currentCard = (membershipId: string) =>
     prisma.loyaltyCard.findFirst({ where: { membershipId, redeemedAt: null }, orderBy: { createdAt: "desc" }, include: { _count: { select: { punches: true } } } });
 
-  async function stateFor(membershipId: string, program: NonNullable<Awaited<ReturnType<typeof context>> extends infer C ? (C extends { program: infer P } ? P : never) : never>) {
+  async function liveCard(membershipId: string, now: Date) {
     const card = await currentCard(membershipId);
+    return card && !cardExpired(card, now) ? card : null;
+  }
+
+  async function stateFor(membershipId: string, program: NonNullable<Awaited<ReturnType<typeof context>> extends infer C ? (C extends { program: infer P } ? P : never) : never>) {
+    const now = new Date();
+    const card = await liveCard(membershipId, now);
     const last = await prisma.loyaltyPunch.findFirst({ where: { membershipId }, orderBy: { createdAt: "desc" }, select: { day: true } });
     return {
-      program: { goal: program.goal, rewardText: program.rewardText, startsAt: program.startsAt, endsAt: program.endsAt, window: windowState(program.startsAt, program.endsAt, new Date()) },
-      card: card ? { punches: card._count.punches, goal: card.goal, rewardText: card.rewardText, complete: card.completedAt !== null } : null,
+      program: { goal: program.goal, rewardText: program.rewardText, startsAt: program.startsAt, endsAt: program.endsAt, cardValidDays: program.cardValidDays, window: windowState(program.startsAt, program.endsAt, now) },
+      card: card ? { punches: card._count.punches, goal: card.goal, rewardText: card.rewardText, complete: card.completedAt !== null, expiresAt: card.expiresAt } : null,
       punchedToday: last?.day === today(),
     };
   }
@@ -107,7 +113,7 @@ export async function loyaltyRoutes(app: FastifyInstance) {
       return reply.code(422).send({ error: havePosition ? "too_far" : "location_required" });
     }
 
-    const card = (await currentCard(c.membership.id)) ?? { ...(await prisma.loyaltyCard.create({ data: { membershipId: c.membership.id, goal: c.program.goal, rewardText: c.program.rewardText } })), _count: { punches: 0 } };
+    const card = (await liveCard(c.membership.id, now)) ?? { ...(await prisma.loyaltyCard.create({ data: { membershipId: c.membership.id, goal: c.program.goal, rewardText: c.program.rewardText, expiresAt: cardExpiry(c.program.cardValidDays, now) } })), _count: { punches: 0 } };
     if (card.completedAt) return reply.code(409).send({ error: "card_complete" });
     try {
       await prisma.loyaltyPunch.create({ data: { cardId: card.id, membershipId: c.membership.id, day, method, distanceMeters: meters } });

@@ -205,17 +205,18 @@ enum LoyaltyMethod {
 
 // The business's loyalty offer: collect `goal` visits, get the reward. One program per business.
 model LoyaltyProgram {
-  id           String    @id @default(uuid()) @db.Uuid
-  businessId   String    @unique @db.Uuid
-  enabled      Boolean   @default(false)
-  goal         Int       @default(10)
-  rewardText   String
+  id            String    @id @default(uuid()) @db.Uuid
+  businessId    String    @unique @db.Uuid
+  enabled       Boolean   @default(false)
+  goal          Int       @default(10)
+  rewardText    String
   // Punches only count inside this window. Null means no limit on that side.
-  startsAt     DateTime?
-  endsAt       DateTime?
+  startsAt      DateTime?
+  endsAt        DateTime?
+  cardValidDays Int?
   // How close the guest's phone must be to the business.
-  radiusMeters Int       @default(150)
-  updatedAt    DateTime  @updatedAt
+  radiusMeters  Int       @default(150)
+  updatedAt     DateTime  @updatedAt
 
   business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
 }
@@ -228,6 +229,7 @@ model LoyaltyCard {
   rewardText   String
   completedAt  DateTime?
   redeemedAt   DateTime?
+  expiresAt    DateTime?
   createdAt    DateTime  @default(now())
 
   membership Membership     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
