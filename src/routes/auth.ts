@@ -10,6 +10,7 @@ import { hashToken, newToken } from "../lib/tokens.js";
 import { stripeGuard } from "../lib/stripeGuard.js";
 import { cancelBilling, removeFiles } from "../lib/teardown.js";
 import { verifyTurnstile } from "../lib/turnstile.js";
+import { SESSION_COOKIE } from "../lib/sessionCookie.js";
 import { UI_LANGS } from "../schemas.js";
 
 const DAY = 24 * 60 * 60 * 1000;
@@ -85,12 +86,12 @@ export async function authRoutes(app: FastifyInstance) {
     if (!user || !valid) return reply.code(401).send({ error: "invalid_credentials" });
     if (!user.emailVerifiedAt) return reply.code(403).send({ error: "email_not_verified" });
     const jwt = app.jwt.sign({ sub: user.id }, { expiresIn: "7d" });
-    reply.setCookie("session", jwt, { path: "/", httpOnly: true, sameSite: "lax", secure: config.COOKIE_SECURE, maxAge: (7 * DAY) / 1000 });
+    reply.setCookie(SESSION_COOKIE, jwt, { path: "/", httpOnly: true, sameSite: "lax", secure: config.COOKIE_SECURE, maxAge: (7 * DAY) / 1000 });
     return { ok: true };
   });
 
   r.post("/auth/logout", async (_req, reply) => {
-    reply.clearCookie("session", { path: "/" });
+    reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
   });
 
@@ -123,7 +124,7 @@ export async function authRoutes(app: FastifyInstance) {
     if (reply.sent) return reply;
     await prisma.user.delete({ where: { id: user.id } });
     await removeFiles(uploads.map((u) => u.filename));
-    reply.clearCookie("session", { path: "/" });
+    reply.clearCookie(SESSION_COOKIE, { path: "/" });
     return { ok: true };
   });
 

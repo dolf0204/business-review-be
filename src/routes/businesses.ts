@@ -9,7 +9,7 @@ import { businessView, MAX_BUSINESSES_PER_OWNER, publishProblem } from "../lib/b
 import { newCode, shareUrl } from "../lib/code.js";
 import { findPlaces, placeDetails, PlacesError } from "../lib/googlePlaces.js";
 import { mediaFilename } from "../lib/media.js";
-import { REVIEWED_FIELDS, reviewBusiness } from "../lib/review.js";
+import { recheckBusiness, REVIEWED_FIELDS, reviewBusiness } from "../lib/review.js";
 import { stripeGuard } from "../lib/stripeGuard.js";
 import { cancelBilling } from "../lib/teardown.js";
 import { releaseUpload } from "./uploads.js";
@@ -51,16 +51,16 @@ export async function businessRoutes(app: FastifyInstance) {
     if (!b) return reply.code(404).send({ error: "not_found" });
     const { template, primary, accent, ...fields } = req.body;
     const theme = { ...(b.theme as Record<string, unknown>), ...(template ? { template } : {}), ...(primary ? { primary } : {}), ...(accent ? { accent } : {}) };
-    // An approved business that changes what guests read has to be checked again.
+    // A live business that changes what guests read is checked again, whether it was approved or is still waiting.
     const reviewedChange = REVIEWED_FIELDS.some((k) => k in fields && (fields as Record<string, unknown>)[k] !== b[k]);
     const reopen = b.approvedAt !== null && reviewedChange;
     const updated = await prisma.business.update({ where: { id: b.id }, data: { ...fields, theme, ...(reopen ? { approvedAt: null } : {}) } });
-    const current = reopen && updated.publishedAt ? await reviewBusiness(updated, true, req.log) : updated;
+    const checked = reviewedChange && updated.publishedAt ? await recheckBusiness(updated, req.log) : { business: updated, fixes: {} };
     // An image that was replaced or removed is deleted, so storage does not fill up with unused pictures.
     for (const key of ["logoUrl", "backgroundUrl"] as const) {
       if (key in fields && b[key] && b[key] !== updated[key]) await releaseUpload(req.user.sub, mediaFilename(b[key]));
     }
-    return businessView(current);
+    return { ...businessView(checked.business), suggestions: checked.fixes };
   });
 
   r.delete("/businesses/:id", { ...auth, schema: { params: idParam } }, async (req, reply) => {

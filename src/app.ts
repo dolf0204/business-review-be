@@ -22,6 +22,7 @@ import { postRoutes } from "./routes/posts.js";
 import { healthRoutes } from "./routes/health.js";
 import { publicRoutes } from "./routes/public.js";
 import { partnerRoutes } from "./routes/partners.js";
+import { SESSION_COOKIE } from "./lib/sessionCookie.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -69,7 +70,7 @@ export async function buildApp() {
   });
   await app.register(cookie);
   await app.register(rateLimit, { max: 200, timeWindow: "1 minute" });
-  await app.register(jwt, { secret: config.JWT_SECRET, cookie: { cookieName: "session", signed: false } });
+  await app.register(jwt, { secret: config.JWT_SECRET, cookie: { cookieName: SESSION_COOKIE, signed: false } });
 
   // Images are stored as "/media/<id>.webp". Every JSON answer gets the API address that is configured now, so moving the API never
   // breaks an image.

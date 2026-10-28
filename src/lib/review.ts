@@ -2,13 +2,13 @@ import type { FastifyBaseLogger } from "fastify";
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import type { Business, Coupon } from "../generated/prisma/client.js";
-import { checkBusinessContent, checkCouponContent, contentCheckEnabled } from "./contentCheck.js";
+import { takeCheckSlot } from "./checkLimit.js";
+import { checkBusinessContent, checkCouponContent, checkSpelling, contentCheckEnabled } from "./contentCheck.js";
 import { sendMail } from "./mail.js";
+import { acceptableFixes, type Fixes } from "./textFixes.js";
 import { couponReviewKey, couponReviewMail, operatorList, reviewKey, reviewMail } from "./operator.js";
 
-type Log = Pick<FastifyBaseLogger, "info" | "error">;
-
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+type Log = Pick<FastifyBaseLogger, "info" | "warn" | "error">;
 
 /** Tell the operators that a business needs to be looked at. A mail problem is logged, never shown to the owner. */
 export async function requestApproval(b: Pick<Business, "id" | "name" | "offerText" | "address" | "googleMapsUrl" | "ownerId">, changed: boolean, log: Log, note?: string) {
@@ -26,15 +26,37 @@ export async function requestApproval(b: Pick<Business, "id" | "name" | "offerTe
   }
 }
 
-async function approve(b: Business, log: Log): Promise<Business> {
-  const approved = await prisma.business.update({ where: { id: b.id }, data: { approvedAt: new Date() } });
-  const owner = await prisma.user.findUnique({ where: { id: b.ownerId }, select: { email: true } });
-  if (owner) {
-    await sendMail({ to: owner.email, subject: `${b.name} is approved`, html: `<p>Good news: <strong>${esc(b.name)}</strong> is approved and can now be shown to tourists on TouristAsk.</p>` }, log).catch((err) =>
-      log.error({ err: (err as Error).message }, "approval email could not be sent"),
-    );
+async function approve(b: Business): Promise<Business> {
+  return prisma.business.update({ where: { id: b.id }, data: { approvedAt: new Date() } });
+}
+
+export interface BusinessReview {
+  business: Business;
+  fixes: Fixes;
+}
+
+async function runReview(b: Business, changed: boolean, log: Log): Promise<BusinessReview> {
+  if (!contentCheckEnabled()) {
+    await requestApproval(b, changed, log);
+    return { business: b, fixes: {} };
   }
-  return approved;
+  try {
+    const text = { name: b.name, kind: b.kind, subtitle: b.subtitle, offerText: b.offerText, address: b.address, websiteUrl: b.websiteUrl };
+    const proposed = await checkSpelling(text).catch((err) => {
+      log.warn({ businessId: b.id, err: (err as Error).message }, "spelling check failed");
+      return {};
+    });
+    const fixes = acceptableFixes({ name: b.name, subtitle: b.subtitle, offerText: b.offerText }, proposed);
+    const result = await checkBusinessContent({ ...text, ...fixes });
+    log.info({ businessId: b.id, verdict: result.verdict, reason: result.reason, proposed: Object.keys(proposed), fixes: Object.keys(fixes) }, "automatic check of a business");
+    if (result.verdict === "ok") return { business: await approve(b), fixes };
+    await requestApproval(b, changed, log, result.reason);
+    return { business: b, fixes };
+  } catch (err) {
+    log.error({ businessId: b.id, err: (err as Error).message }, "automatic check failed, sending to the operators");
+    await requestApproval(b, changed, log, "The automatic check could not run.");
+    return { business: b, fixes: {} };
+  }
 }
 
 /**
@@ -42,20 +64,15 @@ async function approve(b: Business, log: Log): Promise<Business> {
  * goes to the operators. The check never rejects anyone: only a person does that. Returns the business as it is afterwards.
  */
 export async function reviewBusiness(b: Business, changed: boolean, log: Log): Promise<Business> {
-  if (!contentCheckEnabled()) {
-    await requestApproval(b, changed, log);
-    return b;
+  return (await runReview(b, changed, log)).business;
+}
+
+export async function recheckBusiness(b: Business, log: Log): Promise<BusinessReview> {
+  if (!takeCheckSlot(b.id)) {
+    log.warn({ businessId: b.id }, "too many checks for one business, skipped until the hour is over");
+    return { business: b, fixes: {} };
   }
-  try {
-    const result = await checkBusinessContent({ name: b.name, kind: b.kind, subtitle: b.subtitle, offerText: b.offerText, address: b.address, websiteUrl: b.websiteUrl });
-    log.info({ businessId: b.id, verdict: result.verdict, reason: result.reason }, "automatic check of a business");
-    if (result.verdict === "ok") return await approve(b, log);
-    await requestApproval(b, changed, log, result.reason);
-  } catch (err) {
-    log.error({ businessId: b.id, err: (err as Error).message }, "automatic check failed, sending to the operators");
-    await requestApproval(b, changed, log, "The automatic check could not run.");
-  }
-  return b;
+  return runReview(b, true, log);
 }
 
 type CouponOwner = Pick<Business, "name" | "kind" | "ownerId">;
