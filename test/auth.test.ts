@@ -1,5 +1,6 @@
 import argon2 from "argon2";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn() },
@@ -82,7 +83,7 @@ describe("sign up and sign in", () => {
     expect((await call("POST", "/auth/login", { email: "a@example.com", password: "wrong password!" })).statusCode).toBe(401);
     const ok = await call("POST", "/auth/login", { email: "a@example.com", password: "correct horse battery" });
     expect(ok.statusCode).toBe(200);
-    expect(String(ok.headers["set-cookie"])).toMatch(/session=.*HttpOnly/i);
+    expect(String(ok.headers["set-cookie"])).toMatch(new RegExp(`${SESSION_COOKIE}=.*HttpOnly`, "i"));
   });
 
   it("confirms an email with a valid link once, and refuses an old or used one", async () => {

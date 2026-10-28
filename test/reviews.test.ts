@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findUnique: vi.fn(), findFirst: vi.fn() },
@@ -151,7 +152,7 @@ describe("numbers for the owner", () => {
     db.loyaltyCard.count.mockResolvedValue(2);
     db.couponUse.count.mockResolvedValue(9);
     const app = await buildApp();
-    const cookie = `session=${app.jwt.sign({ sub: "u1" })}`;
+    const cookie = `${SESSION_COOKIE}=${app.jwt.sign({ sub: "u1" })}`;
     const id = "11111111-1111-4111-8111-111111111111";
     const res = await app.inject({ url: `/businesses/${id}/stats`, headers: { cookie } });
     expect(res.json()).toEqual({ members: 12, offersOptIn: 5, visits: 40, googleReviewClicks: 7, tripadvisorReviewClicks: 3, stamps: 25, rewardsRedeemed: 2, couponUses: 9 });

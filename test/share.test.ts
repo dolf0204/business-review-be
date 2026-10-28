@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
 
 const db = vi.hoisted(() => ({ business: { findFirst: vi.fn(), findUnique: vi.fn() }, post: { findMany: vi.fn() }, loyaltyProgram: { findUnique: vi.fn() }, coupon: { findMany: vi.fn() } }));
 vi.mock("../src/db.js", () => ({ prisma: db }));
@@ -16,7 +17,7 @@ const row = (over = {}) => ({
 
 async function owner(url: string) {
   const app = await buildApp();
-  const res = await app.inject({ url, headers: { cookie: `session=${app.jwt.sign({ sub: "u1" })}` } });
+  const res = await app.inject({ url, headers: { cookie: `${SESSION_COOKIE}=${app.jwt.sign({ sub: "u1" })}` } });
   await app.close();
   return res;
 }

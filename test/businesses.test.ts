@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn(), deleteMany: vi.fn() },
@@ -24,7 +25,7 @@ const PAID = new Date(Date.now() + 30 * 86_400_000);
 async function call(method: "GET" | "POST" | "PATCH" | "PUT" | "DELETE", url: string, payload?: object) {
   const app = await buildApp();
   const jwt = app.jwt.sign({ sub: "u1" });
-  const res = await app.inject({ method, url, payload, headers: { cookie: `session=${jwt}` } });
+  const res = await app.inject({ method, url, payload, headers: { cookie: `${SESSION_COOKIE}=${jwt}` } });
   await app.close();
   return res;
 }

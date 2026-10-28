@@ -1,4 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findUnique: vi.fn() },
@@ -141,7 +142,7 @@ describe("a signed-in guest", () => {
   });
 
   it("can never open the owner's screens", async () => {
-    expect((await call("GET", "/businesses", undefined, `session=${await guestCookie()}`)).statusCode).toBe(401);
+    expect((await call("GET", "/businesses", undefined, `${SESSION_COOKIE}=${await guestCookie()}`)).statusCode).toBe(401);
   });
 
   it("changes name and language, and withdraws consent", async () => {

@@ -3,6 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
+import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
 
 const dir = vi.hoisted(() => ({ path: "" }));
 const db = vi.hoisted(() => ({
@@ -30,7 +31,7 @@ function multipart(filename: string, type: string, data: Buffer) {
 async function upload(filename: string, type: string, data: Buffer, signedIn = true) {
   const app = await buildApp();
   const m = multipart(filename, type, data);
-  const res = await app.inject({ method: "POST", url: "/uploads", payload: m.payload, headers: { "content-type": m.contentType, ...(signedIn ? { cookie: `session=${app.jwt.sign({ sub: "u1" })}` } : {}) } });
+  const res = await app.inject({ method: "POST", url: "/uploads", payload: m.payload, headers: { "content-type": m.contentType, ...(signedIn ? { cookie: `${SESSION_COOKIE}=${app.jwt.sign({ sub: "u1" })}` } : {}) } });
   await app.close();
   return res;
 }
@@ -106,7 +107,7 @@ describe("replacing a logo", () => {
     db.business.update.mockImplementation(async ({ data }: { data: object }) => ({ id: ID, name: "K", theme: {}, logoUrl: `/media/${OLD}`, ...data }));
     db.upload.deleteMany.mockResolvedValue({ count: 1 });
     const app = await buildApp();
-    const res = await app.inject({ method: "PATCH", url: `/businesses/${ID}`, payload: { logoUrl: `http://localhost:8090/media/${NEW}` }, headers: { cookie: `session=${app.jwt.sign({ sub: "u1" })}` } });
+    const res = await app.inject({ method: "PATCH", url: `/businesses/${ID}`, payload: { logoUrl: `http://localhost:8090/media/${NEW}` }, headers: { cookie: `${SESSION_COOKIE}=${app.jwt.sign({ sub: "u1" })}` } });
     await app.close();
     expect(res.statusCode).toBe(200);
     expect(db.business.update.mock.calls[0]![0].data.logoUrl).toBe(`/media/${NEW}`);

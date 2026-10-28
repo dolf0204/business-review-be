@@ -1,5 +1,6 @@
 import argon2 from "argon2";
 import { beforeEach, describe, expect, it, vi } from "vitest";
+import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   user: { findUnique: vi.fn(), delete: vi.fn() },
@@ -38,7 +39,7 @@ const FILE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp";
 
 async function call(method: "DELETE", url: string, payload?: object) {
   const app = await buildApp();
-  const res = await app.inject({ method, url, payload, headers: { cookie: `session=${app.jwt.sign({ sub: "u1" })}` } });
+  const res = await app.inject({ method, url, payload, headers: { cookie: `${SESSION_COOKIE}=${app.jwt.sign({ sub: "u1" })}` } });
   await app.close();
   return res;
 }
@@ -105,7 +106,7 @@ describe("deleting an owner account", () => {
     expect(stripeApi.subscriptions.cancel).toHaveBeenCalledWith("sub_1");
     expect(db.user.delete).toHaveBeenCalledWith({ where: { id: "u1" } });
     expect(fsApi.unlink).toHaveBeenCalledTimes(1);
-    expect(String(res.headers["set-cookie"])).toMatch(/session=;/);
+    expect(String(res.headers["set-cookie"])).toMatch(new RegExp(`${SESSION_COOKIE}=;`));
   });
 
   it("keeps the account when Stripe cannot cancel", async () => {
