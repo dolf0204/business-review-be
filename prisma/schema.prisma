@@ -52,6 +52,8 @@ model Business {
   owner                User      @relation(fields: [ownerId], references: [id], onDelete: Cascade)
   // Stable short code printed in the QR code and written on the NFC tag. Never changes.
   code                 String    @unique
+  slug                 String?   @unique
+  slugLockedAt         DateTime?
   name                 String
   // The business kind, same values as TouristAsk sponsors: restaurant, cafe, bar, beauty, shop, sport, sight, beach, other.
   kind                 String    @default("restaurant")
@@ -93,6 +95,7 @@ model Business {
   campaigns      Campaign[]
   subscription   BusinessSubscription?
   kitRequests    KitRequest[]
+  shopOrders     ShopOrder[]
   coupons        Coupon[]
   memberships    Membership[]
   guestTokens    GuestToken[]
@@ -405,4 +408,55 @@ model CouponUse {
   membership Membership @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
   @@unique([couponId, membershipId])
+}
+
+enum ShopOrderStatus {
+  PENDING_PAYMENT
+  PAID
+  SHIPPED
+  CANCELED
+}
+
+model ShopOrder {
+  id              String          @id @default(uuid()) @db.Uuid
+  businessId      String          @db.Uuid
+  status          ShopOrderStatus @default(PENDING_PAYMENT)
+  freePeriodEnd   DateTime?
+  subtotalCents   Int
+  shippingCents   Int
+  totalCents      Int
+  currency        String          @default("eur")
+  stripeSessionId String?         @unique
+  name            String
+  line1           String
+  line2           String?
+  postalCode      String
+  city            String
+  country         String
+  phone           String?
+  trackingUrl     String?
+  createdAt       DateTime        @default(now())
+  paidAt          DateTime?
+  shippedAt       DateTime?
+
+  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items    ShopOrderItem[]
+
+  @@unique([businessId, freePeriodEnd])
+  @@index([businessId, createdAt])
+}
+
+model ShopOrderItem {
+  id        String @id @default(uuid()) @db.Uuid
+  orderId   String @db.Uuid
+  design    String
+  finish    String
+  size      String
+  printText String
+  listCents Int
+  unitCents Int
+
+  order ShopOrder @relation(fields: [orderId], references: [id], onDelete: Cascade)
+
+  @@index([orderId])
 }

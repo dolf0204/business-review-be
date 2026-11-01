@@ -1,9 +1,9 @@
-// The email a guest gets when a business sends an offer. Plain text from the owner is escaped and laid out; nothing the owner types is trusted as HTML.
+// The email a customer gets when a business sends an offer. Plain text from the owner is escaped and laid out; nothing the owner types is trusted as HTML.
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 
 const TEXT = {
-  en: { open: (n: string) => `Open ${n}`, why: (n: string) => `You get this email because you joined ${n} and agreed to receive its offers.`, stop: "Unsubscribe", test: "This is a test. Guests see the same mail with their own unsubscribe link." },
-  hr: { open: (n: string) => `Otvori ${n}`, why: (n: string) => `Ovu poruku primate jer ste se pridružili obrtu ${n} i pristali primati njegove ponude.`, stop: "Odjava", test: "Ovo je probna poruka. Gosti vide istu poruku sa svojom poveznicom za odjavu." },
+  en: { open: (n: string) => `Open ${n}`, why: (n: string) => `You get this email because you joined ${n} and agreed to receive its offers.`, stop: "Unsubscribe", test: "This is a test. Customers see the same mail with their own unsubscribe link." },
+  hr: { open: (n: string) => `Otvori ${n}`, why: (n: string) => `Ovu poruku primate jer ste se pridružili obrtu ${n} i pristali primati njegove ponude.`, stop: "Odjava", test: "Ovo je probna poruka. Klijenti vide istu poruku sa svojom poveznicom za odjavu." },
 } as const;
 
 export interface OfferMailInput {

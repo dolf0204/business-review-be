@@ -6,6 +6,7 @@ const schema = z.object({
   PUBLIC_API_URL: z.url(),
   // The front end: business admin and guest pages are one app. Allowed CORS origin and the base of every QR code.
   APP_URL: z.url(),
+  SLUG_BASE_DOMAIN: z.string().trim().toLowerCase().regex(/^$|^[a-z0-9]([a-z0-9.-]*[a-z0-9])?(:\d{1,5})?$/).default(""),
   DATABASE_URL: z.string().min(1),
   JWT_SECRET: z.string().min(32),
   COOKIE_SECURE: z.stringbool().default(false),

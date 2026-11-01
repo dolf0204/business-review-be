@@ -5,6 +5,7 @@ import { billingConfigured, loadPrices, priceIds, stripe, syncSubscription } fro
 import { config } from "../config.js";
 import { prisma } from "../db.js";
 import { ownedBusiness } from "../lib/access.js";
+import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../lib/shopFulfil.js";
 import { stripeGuard } from "../lib/stripeGuard.js";
 import { idParam } from "../schemas.js";
 
@@ -141,6 +142,13 @@ export async function stripeWebhookRoutes(app: FastifyInstance) {
         const s = event.data.object;
         const subId = typeof s.subscription === "string" ? s.subscription : s.subscription?.id;
         if (s.mode === "subscription" && subId) await syncSubscription(subId);
+        const shopOrderId = s.metadata?.[SHOP_ORDER_METADATA];
+        if (s.mode === "payment" && s.payment_status === "paid" && shopOrderId) await fulfilShopOrder(shopOrderId, req.log, s.amount_total ?? undefined);
+        break;
+      }
+      case "checkout.session.expired": {
+        const shopOrderId = event.data.object.metadata?.[SHOP_ORDER_METADATA];
+        if (shopOrderId) await cancelShopOrder(shopOrderId);
         break;
       }
       case "customer.subscription.created":

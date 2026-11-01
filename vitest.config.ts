@@ -19,6 +19,8 @@ export default defineConfig({
       STRIPE_PRICE_YEARLY: "price_year",
       KIT_ORDER_EMAIL: "kits@example.com",
       OPERATOR_EMAILS: "boss@example.com, second@example.com",
+      TURNSTILE_SECRET: "",
+      ANTHROPIC_API_KEY: "",
     },
   },
 });

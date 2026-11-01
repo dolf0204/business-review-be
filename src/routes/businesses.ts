@@ -10,8 +10,10 @@ import { newCode, shareUrl } from "../lib/code.js";
 import { findPlaces, placeDetails, PlacesError } from "../lib/googlePlaces.js";
 import { mediaFilename } from "../lib/media.js";
 import { recheckBusiness, REVIEWED_FIELDS, reviewBusiness } from "../lib/review.js";
+import { settleSlug } from "../lib/slugLock.js";
 import { stripeGuard } from "../lib/stripeGuard.js";
 import { cancelBilling } from "../lib/teardown.js";
+import { ownerLang } from "./slug.js";
 import { releaseUpload } from "./uploads.js";
 import { idParam, KINDS, profileSchema } from "../schemas.js";
 
@@ -81,6 +83,7 @@ export async function businessRoutes(app: FastifyInstance) {
     if (problem) return reply.code(422).send({ error: problem });
     // Paying is what makes a page work: no payment, no publishing.
     if (!b.paidUntil || b.paidUntil <= new Date()) return reply.code(402).send({ error: "payment_required" });
+    if (!(await settleSlug(b, await ownerLang(req.user.sub)))) return reply.code(422).send({ error: "slug_unavailable" });
     const updated = await prisma.business.update({ where: { id: b.id }, data: { publishedAt: b.publishedAt ?? new Date() } });
     // The first time a business goes live (and is not yet approved), the operator is asked to look at it.
     const current = !b.publishedAt && !updated.approvedAt ? await reviewBusiness(updated, false, req.log) : updated;

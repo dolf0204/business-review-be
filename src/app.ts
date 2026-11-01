@@ -8,6 +8,7 @@ import { serializerCompiler, validatorCompiler } from "fastify-type-provider-zod
 import { config } from "./config.js";
 import { authRoutes } from "./routes/auth.js";
 import { businessRoutes } from "./routes/businesses.js";
+import { slugRoutes } from "./routes/slug.js";
 import { guestRoutes } from "./routes/guests.js";
 import { reviewRoutes } from "./routes/reviews.js";
 import { operatorRoutes } from "./routes/operator.js";
@@ -17,12 +18,14 @@ import { uploadRoutes } from "./routes/uploads.js";
 import { expandMedia } from "./lib/media.js";
 import { billingRoutes, stripeWebhookRoutes } from "./routes/billing.js";
 import { kitRoutes } from "./routes/kit.js";
+import { shopRoutes } from "./routes/shop.js";
 import { couponRoutes } from "./routes/coupons.js";
 import { postRoutes } from "./routes/posts.js";
 import { healthRoutes } from "./routes/health.js";
 import { publicRoutes } from "./routes/public.js";
 import { partnerRoutes } from "./routes/partners.js";
 import { SESSION_COOKIE } from "./lib/sessionCookie.js";
+import { slugOrigin } from "./lib/siteUrl.js";
 
 declare module "fastify" {
   interface FastifyInstance {
@@ -62,9 +65,11 @@ export async function buildApp() {
   app.setValidatorCompiler(validatorCompiler);
   app.setSerializerCompiler(serializerCompiler);
 
+  const slugPages = slugOrigin();
+
   await app.register(helmet);
   await app.register(cors, {
-    origin: [config.APP_URL],
+    origin: slugPages ? [config.APP_URL, slugPages] : [config.APP_URL],
     credentials: true,
     methods: ["GET", "HEAD", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
   });
@@ -92,6 +97,7 @@ export async function buildApp() {
   await app.register(healthRoutes);
   await app.register(authRoutes);
   await app.register(businessRoutes);
+  await app.register(slugRoutes);
   await app.register(postRoutes);
   await app.register(guestRoutes);
   await app.register(reviewRoutes);
@@ -101,6 +107,7 @@ export async function buildApp() {
   await app.register(uploadRoutes);
   await app.register(billingRoutes);
   await app.register(kitRoutes);
+  await app.register(shopRoutes);
   await app.register(couponRoutes);
   await app.register(stripeWebhookRoutes);
   await app.register(partnerRoutes);

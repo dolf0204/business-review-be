@@ -8,6 +8,8 @@ const db = vi.hoisted(() => ({
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
 vi.mock("../src/lib/mail.js", () => mail);
 vi.mock("../src/db.js", () => ({ prisma: db }));
+const slug = vi.hoisted(() => ({ settleSlug: vi.fn<() => Promise<string | null>>(async () => "tockica") }));
+vi.mock("../src/lib/slugLock.js", () => slug);
 const places = vi.hoisted(() => ({ findPlaces: vi.fn(), placeDetails: vi.fn() }));
 vi.mock("../src/lib/googlePlaces.js", async (orig) => ({ ...(await orig<typeof import("../src/lib/googlePlaces.js")>()), ...places }));
 
@@ -110,6 +112,19 @@ describe("businesses", () => {
     const off = await call("POST", `/businesses/${ID}/unpublish`);
     expect(db.business.update.mock.calls.at(-1)![0].data.publishedAt).toBeNull();
     expect(off.statusCode).toBe(200);
+  });
+
+  it("settles the address when a page goes live, and does not publish without one", async () => {
+    db.business.findFirst.mockResolvedValue(row({ googlePlaceId: "ChIJabcdefghij123", lat: 44.1, lng: 15.2, paidUntil: PAID }));
+    db.user.findUnique.mockResolvedValue({ uiLang: "hr" });
+    expect((await call("POST", `/businesses/${ID}/publish`)).statusCode).toBe(200);
+    expect(slug.settleSlug).toHaveBeenLastCalledWith(expect.objectContaining({ id: ID }), "hr");
+    db.business.update.mockClear();
+    slug.settleSlug.mockResolvedValueOnce(null);
+    const none = await call("POST", `/businesses/${ID}/publish`);
+    expect(none.statusCode).toBe(422);
+    expect(none.json().error).toBe("slug_unavailable");
+    expect(db.business.update).not.toHaveBeenCalled();
   });
 });
 
