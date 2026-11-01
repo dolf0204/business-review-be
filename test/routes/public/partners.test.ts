@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({ business: { findMany: vi.fn() } }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
-import { buildApp } from "../src/app.js";
+import { buildApp } from "../../../src/app.js";
 
 const KEY = "partner-key-for-tests-0123456789abcdef";
 const biz = (over = {}) => ({

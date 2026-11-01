@@ -1,14 +1,14 @@
 import type { FastifyInstance, FastifyReply, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { joinMail } from "../lib/guestMail.js";
-import { sendMail } from "../lib/mail.js";
-import { hashToken, newToken } from "../lib/tokens.js";
-import { verifyTurnstile } from "../lib/turnstile.js";
-import { UI_LANGS } from "../schemas.js";
-import { isLive } from "../lib/live.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { joinMail } from "../../lib/mail/guestMail.js";
+import { sendMail } from "../../lib/mail/mail.js";
+import { hashToken, newToken } from "../../lib/auth/tokens.js";
+import { verifyTurnstile } from "../../lib/auth/turnstile.js";
+import { UI_LANGS } from "../../schemas.js";
+import { isLive } from "../../lib/business/live.js";
 
 const DAY = 24 * 60 * 60 * 1000;
 const LINK_TTL = 30 * 60 * 1000;

@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { SHIPPING_CENTS, SIZE_PRICE_CENTS, YEARLY_DISCOUNT_PERCENT, type ShopDesignId, type ShopFinish, type ShopSize } from "./shopCatalog.js";
+import { SHIPPING_CENTS, SIZE_PRICE_CENTS, YEARLY_DISCOUNT_PERCENT, type ShopDesignId, type ShopFinish, type ShopSize } from "./catalog.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 

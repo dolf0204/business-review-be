@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findUnique: vi.fn() },
@@ -7,12 +7,12 @@ const db = vi.hoisted(() => ({
   guestToken: { count: vi.fn(), create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   membership: { upsert: vi.fn(), findMany: vi.fn(), findFirst: vi.fn(), update: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
 
-import { buildApp } from "../src/app.js";
-import { hashToken } from "../src/lib/tokens.js";
+import { buildApp } from "../../../src/app.js";
+import { hashToken } from "../../../src/lib/auth/tokens.js";
 
 const GUEST = { id: "g1", email: "tourist@example.com", name: null, lang: "en", emailVerifiedAt: null };
 const BIZ = { id: "b1", code: "abcd2345", name: "Konoba <Ribar>", publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000) };

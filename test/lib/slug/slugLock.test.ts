@@ -7,10 +7,10 @@ const { updateMany, findUnique, claimSlug, freeSlugsFor } = vi.hoisted(() => ({
   freeSlugsFor: vi.fn(),
 }));
 
-vi.mock("../src/db.js", () => ({ prisma: { business: { updateMany, findUnique } } }));
-vi.mock("../src/lib/slugs.js", () => ({ SLUG_RESULT: { ok: "ok", taken: "taken", locked: "locked" }, claimSlug, freeSlugsFor }));
+vi.mock("../../../src/db.js", () => ({ prisma: { business: { updateMany, findUnique } } }));
+vi.mock("../../../src/lib/slug/slugs.js", () => ({ SLUG_RESULT: { ok: "ok", taken: "taken", locked: "locked" }, claimSlug, freeSlugsFor }));
 
-import { lockSlug, settleSlug } from "../src/lib/slugLock.js";
+import { lockSlug, settleSlug } from "../../../src/lib/slug/slugLock.js";
 
 const business = { id: "b-1", name: "Točkica", kind: "restaurant", address: null, slug: null, slugLockedAt: null };
 

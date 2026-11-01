@@ -3,22 +3,22 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import sharp from "sharp";
 import { afterAll, beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const dir = vi.hoisted(() => ({ path: "" }));
 const db = vi.hoisted(() => ({
   upload: { aggregate: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
   business: { findFirst: vi.fn(), update: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
-vi.mock("../src/config.js", async (orig) => {
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/config.js", async (orig) => {
   const mod = (await orig()) as { config: Record<string, unknown> };
   dir.path = mkdtempSync(join(tmpdir(), "brev-up-"));
   return { config: { ...mod.config, UPLOAD_DIR: dir.path } };
 });
 
-import { buildApp } from "../src/app.js";
-import { expandMedia, mediaFilename, toStoredImageUrl } from "../src/lib/media.js";
+import { buildApp } from "../../../src/app.js";
+import { expandMedia, mediaFilename, toStoredImageUrl } from "../../../src/lib/media/media.js";
 
 afterAll(() => rmSync(dir.path, { recursive: true, force: true }));
 

@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-vi.mock("../src/config.js", async (orig) => {
+vi.mock("../../../src/config.js", async (orig) => {
   const mod = (await orig()) as { config: Record<string, unknown> };
   return { config: { ...mod.config, BREVO_API_KEY: "test-brevo-key", NODE_ENV: "development", MAIL_FROM_EMAIL: "no-reply@businessask.eu", MAIL_FROM_NAME: "BusinessAsk" } };
 });
 
-import { sendMail } from "../src/lib/mail.js";
+import { sendMail } from "../../../src/lib/mail/mail.js";
 
 const mail = { to: "guest@example.com", subject: "Confirm", html: '<p><a href="http://localhost:5190/verify-email?token=abc123">Confirm</a></p>' };
 

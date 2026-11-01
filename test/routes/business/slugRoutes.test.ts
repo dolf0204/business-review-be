@@ -1,13 +1,13 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn(), findMany: vi.fn(), updateMany: vi.fn() },
   user: { findUnique: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
-import { buildApp } from "../src/app.js";
+import { buildApp } from "../../../src/app.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({

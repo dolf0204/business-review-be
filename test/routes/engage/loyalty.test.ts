@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn(), findUnique: vi.fn() },
@@ -9,11 +9,11 @@ const db = vi.hoisted(() => ({
   loyaltyCard: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
   loyaltyPunch: { findFirst: vi.fn(), create: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
-import { buildApp } from "../src/app.js";
-import { config } from "../src/config.js";
-import { cardExpired, cardExpiry, isNearEnough, isStaffCode, staffCode, utcDay, windowState } from "../src/lib/loyalty.js";
+import { buildApp } from "../../../src/app.js";
+import { config } from "../../../src/config.js";
+import { cardExpired, cardExpiry, isNearEnough, isStaffCode, staffCode, utcDay, windowState } from "../../../src/lib/engage/loyalty.js";
 
 const B = "11111111-1111-4111-8111-111111111111";
 const TODAY = utcDay(new Date());

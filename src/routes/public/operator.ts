@@ -1,10 +1,10 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { sendMail } from "../lib/mail.js";
-import { isCouponReviewKey, isReviewKey } from "../lib/operator.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { sendMail } from "../../lib/mail/mail.js";
+import { isCouponReviewKey, isReviewKey } from "../../lib/links/operator.js";
 
 const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
 const ids = z.object({ b: z.uuid(), k: z.string().min(10).max(100) });

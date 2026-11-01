@@ -1,10 +1,10 @@
 import type { FastifyBaseLogger } from "fastify";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { isLive } from "./live.js";
-import { sendMail } from "./mail.js";
-import { offerMailHtml } from "./offerMail.js";
-import { unsubscribeKey } from "./unsubscribe.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { isLive } from "../business/live.js";
+import { sendMail } from "../mail/mail.js";
+import { offerMailHtml } from "../mail/offerMail.js";
+import { unsubscribeKey } from "../links/unsubscribe.js";
 
 export const MAX_RECIPIENTS = 1000;
 const PARALLEL = 5;

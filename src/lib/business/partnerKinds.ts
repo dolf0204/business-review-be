@@ -1,4 +1,4 @@
-import { KINDS, type Kind } from "../schemas.js";
+import { KINDS, type Kind } from "../../schemas.js";
 
 /** The kinds TouristAsk already knows. A business of a newer kind is shown there as the closest of these. */
 const PARTNER_KIND: Record<Kind, string> = {

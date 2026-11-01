@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { isRelativeMedia, toStoredImageUrl } from "./lib/media.js";
+import { isRelativeMedia, toStoredImageUrl } from "./lib/media/media.js";
 
 export const KINDS = ["restaurant", "cafe", "bar", "cocktail", "beauty", "barber", "hairdresser", "shop", "florist", "grocery", "sport", "sight", "beach", "other"] as const;
 export type Kind = (typeof KINDS)[number];

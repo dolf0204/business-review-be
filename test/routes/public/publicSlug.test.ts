@@ -1,9 +1,9 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const db = vi.hoisted(() => ({ business: { findUnique: vi.fn() }, post: { findMany: vi.fn() }, loyaltyProgram: { findUnique: vi.fn() }, coupon: { findMany: vi.fn() } }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
-import { buildApp } from "../src/app.js";
+import { buildApp } from "../../../src/app.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({

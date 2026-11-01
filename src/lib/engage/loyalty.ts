@@ -1,5 +1,5 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
-import { distanceKm } from "./geo.js";
+import { distanceKm } from "../places/geo.js";
 
 export const DEFAULT_RADIUS_METERS = 150;
 // Phone positions indoors are off by tens of metres; the reported accuracy is allowed for, but only up to this much.

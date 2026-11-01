@@ -1,13 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { businessView } from "../lib/businessView.js";
-import { isReservedSlug, isValidSlug, slugify } from "../lib/slug.js";
-import { SLUG_RESULT, claimSlug, freeSlugsFor, takenSlugs } from "../lib/slugs.js";
-import { lockSlug } from "../lib/slugLock.js";
-import { idParam } from "../schemas.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { businessView } from "../../lib/business/businessView.js";
+import { isReservedSlug, isValidSlug, slugify } from "../../lib/slug/slug.js";
+import { SLUG_RESULT, claimSlug, freeSlugsFor, takenSlugs } from "../../lib/slug/slugs.js";
+import { lockSlug } from "../../lib/slug/slugLock.js";
+import { idParam } from "../../schemas.js";
 
 const TYPED_SLUG_MAX = 80;
 const DEFAULT_LANG = "en";

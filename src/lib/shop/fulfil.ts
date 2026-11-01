@@ -1,9 +1,9 @@
 import QRCode from "qrcode";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { shareUrl } from "./code.js";
-import { sendMail } from "./mail.js";
-import { shopKey, shopOperatorMail, shopOwnerReceivedMail } from "./shop.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { shareUrl } from "../business/code.js";
+import { sendMail } from "../mail/mail.js";
+import { shopKey, shopOperatorMail, shopOwnerReceivedMail } from "./order.js";
 
 export const SHOP_ORDER_METADATA = "shopOrderId";
 

@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../src/db.js", () => ({ prisma: {} }));
+vi.mock("../../../src/db.js", () => ({ prisma: {} }));
 
-import { findPlaces, placeDetails } from "../src/lib/googlePlaces.js";
+import { findPlaces, placeDetails } from "../../../src/lib/places/googlePlaces.js";
 
 const json = (body: unknown, status = 200) => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const raw = { id: "ChIJabcdefghij123", displayName: { text: "Konoba Ribar" }, formattedAddress: "Obala 1, Zadar", location: { latitude: 44.12, longitude: 15.23 }, rating: 4.7, userRatingCount: 300 };

@@ -1,5 +1,5 @@
-import { prisma } from "../db.js";
-import { newCode } from "./code.js";
+import { prisma } from "../../db.js";
+import { newCode } from "../business/code.js";
 import { type SlugSource, numberedSlug, slugCandidates, slugify } from "./slug.js";
 
 export const SLUG_SUGGESTIONS = 3;

@@ -1,18 +1,18 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn() },
   user: { findUnique: vi.fn() },
   kitRequest: { findFirst: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
 
-import { buildApp } from "../src/app.js";
-import { config } from "../src/config.js";
-import { isKitKey, kitKey, kitOperatorMail, shipCountries } from "../src/lib/kit.js";
+import { buildApp } from "../../../src/app.js";
+import { config } from "../../../src/config.js";
+import { isKitKey, kitKey, kitOperatorMail, shipCountries } from "../../../src/lib/shop/kit.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const KID = "33333333-3333-4333-8333-333333333333";

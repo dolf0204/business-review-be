@@ -1,13 +1,13 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { billingConfigured, loadPrices, priceIds, stripe, syncSubscription } from "../billing/stripe.js";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../lib/shopFulfil.js";
-import { stripeGuard } from "../lib/stripeGuard.js";
-import { idParam } from "../schemas.js";
+import { billingConfigured, loadPrices, priceIds, stripe, syncSubscription } from "../../billing/stripe.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../../lib/shop/fulfil.js";
+import { stripeGuard } from "../../billing/stripeGuard.js";
+import { idParam } from "../../schemas.js";
 
 const strict = { config: { rateLimit: { max: 15, timeWindow: "1 minute" } } };
 const interval = z.enum(["MONTH", "YEAR"]);

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn() },
@@ -7,9 +7,9 @@ const db = vi.hoisted(() => ({
   user: { findUnique: vi.fn(), findUniqueOrThrow: vi.fn() },
   shopOrder: { findFirst: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
 const stripeApi = vi.hoisted(() => ({
   checkout: { sessions: { create: vi.fn(), retrieve: vi.fn(), expire: vi.fn() } },
   webhooks: { constructEvent: vi.fn() },
@@ -25,9 +25,9 @@ vi.mock("stripe", () => {
   return { default: Stripe };
 });
 
-import { buildApp } from "../src/app.js";
-import { config } from "../src/config.js";
-import { shopKey } from "../src/lib/shop.js";
+import { buildApp } from "../../../src/app.js";
+import { config } from "../../../src/config.js";
+import { shopKey } from "../../../src/lib/shop/order.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const OID = "44444444-4444-4444-8444-444444444444";

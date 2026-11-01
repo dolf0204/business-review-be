@@ -1,12 +1,12 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { isNewVisitDay, nextStep, platformState, type PlatformState, type PromptRow } from "../lib/reviews.js";
-import { idParam } from "../schemas.js";
-import { guestOf } from "./guests.js";
-import { isLive } from "../lib/live.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { isNewVisitDay, nextStep, platformState, type PlatformState, type PromptRow } from "../../lib/review/reviews.js";
+import { idParam } from "../../schemas.js";
+import { guestOf } from "../public/guests.js";
+import { isLive } from "../../lib/business/live.js";
 
 const code = z.string().min(4).max(32);
 const platform = z.enum(["google", "tripadvisor"]);

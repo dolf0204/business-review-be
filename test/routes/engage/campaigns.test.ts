@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn() },
@@ -8,15 +8,15 @@ const db = vi.hoisted(() => ({
   campaignDelivery: { createMany: vi.fn(), findMany: vi.fn(), updateMany: vi.fn(), update: vi.fn(), groupBy: vi.fn() },
   membership: { count: vi.fn(), findMany: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
 
-import { buildApp } from "../src/app.js";
-import { config } from "../src/config.js";
-import { offerMailHtml } from "../src/lib/offerMail.js";
-import { isUnsubscribeKey, unsubscribeKey } from "../src/lib/unsubscribe.js";
-import { createDeliveries, resumeCampaigns, runCampaign } from "../src/lib/campaignSend.js";
+import { buildApp } from "../../../src/app.js";
+import { config } from "../../../src/config.js";
+import { offerMailHtml } from "../../../src/lib/mail/offerMail.js";
+import { isUnsubscribeKey, unsubscribeKey } from "../../../src/lib/links/unsubscribe.js";
+import { createDeliveries, resumeCampaigns, runCampaign } from "../../../src/lib/engage/campaignSend.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const M1 = "22222222-2222-4222-8222-222222222222";

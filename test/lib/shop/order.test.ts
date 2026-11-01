@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { freePeriodEnd, isShopKey, priceOrder, shopKey, shopOperatorMail, type ShopItemInput } from "../src/lib/shop.js";
-import { DESIGN_IDS, DESIGNS, FINISHES, publicCatalog, SIZE_PRICE_CENTS } from "../src/lib/shopCatalog.js";
+import { freePeriodEnd, isShopKey, priceOrder, shopKey, shopOperatorMail, type ShopItemInput } from "../../../src/lib/shop/order.js";
+import { DESIGN_IDS, DESIGNS, FINISHES, publicCatalog, SIZE_PRICE_CENTS } from "../../../src/lib/shop/catalog.js";
 
 const item = (size: ShopItemInput["size"], printText = "Salon Lana"): ShopItemInput => ({ design: "halo", finish: "amber", size, printText });
 const NOW = new Date("2026-11-01T12:00:00Z");

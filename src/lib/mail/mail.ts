@@ -1,4 +1,4 @@
-import { config } from "../config.js";
+import { config } from "../../config.js";
 
 export type Attachment = { name: string; content: Buffer };
 export type Mail = {

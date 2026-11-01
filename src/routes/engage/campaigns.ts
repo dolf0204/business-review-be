@@ -1,15 +1,15 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { createDeliveries, fromName, MAX_RECIPIENTS, runCampaign, subjectOf } from "../lib/campaignSend.js";
-import { isLive } from "../lib/live.js";
-import { sendMail } from "../lib/mail.js";
-import { offerMailHtml } from "../lib/offerMail.js";
-import { isUnsubscribeKey } from "../lib/unsubscribe.js";
-import { idParam } from "../schemas.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { createDeliveries, fromName, MAX_RECIPIENTS, runCampaign, subjectOf } from "../../lib/engage/campaignSend.js";
+import { isLive } from "../../lib/business/live.js";
+import { sendMail } from "../../lib/mail/mail.js";
+import { offerMailHtml } from "../../lib/mail/offerMail.js";
+import { isUnsubscribeKey } from "../../lib/links/unsubscribe.js";
+import { idParam } from "../../schemas.js";
 
 export const MAX_CAMPAIGNS_PERIOD_DAYS = 7;
 const DAY = 24 * 60 * 60 * 1000;

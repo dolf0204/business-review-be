@@ -1,4 +1,4 @@
-import { config } from "../config.js";
+import { config } from "../../config.js";
 
 const FILE = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\\.webp";
 const RELATIVE = new RegExp(`^/media/${FILE}$`);

@@ -1,12 +1,12 @@
 import { describe, expect, it, vi } from "vitest";
 
-vi.mock("../src/config.js", async (original) => {
-  const actual = await original<typeof import("../src/config.js")>();
+vi.mock("../../../src/config.js", async (original) => {
+  const actual = await original<typeof import("../../../src/config.js")>();
   return { ...actual, config: { ...actual.config, SLUG_BASE_DOMAIN: "businessask.eu", APP_URL: "https://businessask.eu" } };
 });
 
-import type { Business } from "../src/generated/prisma/client.js";
-import { businessView, publicBusiness } from "../src/lib/businessView.js";
+import type { Business } from "../../../src/generated/prisma/client.js";
+import { businessView, publicBusiness } from "../../../src/lib/business/businessView.js";
 
 const business = (over: Partial<Business> = {}) =>
   ({

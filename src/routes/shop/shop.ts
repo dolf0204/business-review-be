@@ -1,17 +1,17 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { billingConfigured, stripe } from "../billing/stripe.js";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { shipCountries } from "../lib/kit.js";
-import { sendMail } from "../lib/mail.js";
-import { freePeriodEnd, isShopKey, priceOrder, shopShippedMail, type PricedOrder } from "../lib/shop.js";
-import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../lib/shopFulfil.js";
-import { DESIGN_IDS, FINISHES, MAX_ITEMS_PER_ORDER, PRINT_TEXT_MAX, publicCatalog, SHOP_CURRENCY, SIZES, YEARLY_DISCOUNT_PERCENT } from "../lib/shopCatalog.js";
-import { stripeGuard } from "../lib/stripeGuard.js";
-import { idParam } from "../schemas.js";
+import { billingConfigured, stripe } from "../../billing/stripe.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { shipCountries } from "../../lib/shop/kit.js";
+import { sendMail } from "../../lib/mail/mail.js";
+import { freePeriodEnd, isShopKey, priceOrder, shopShippedMail, type PricedOrder } from "../../lib/shop/order.js";
+import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../../lib/shop/fulfil.js";
+import { DESIGN_IDS, FINISHES, MAX_ITEMS_PER_ORDER, PRINT_TEXT_MAX, publicCatalog, SHOP_CURRENCY, SIZES, YEARLY_DISCOUNT_PERCENT } from "../../lib/shop/catalog.js";
+import { stripeGuard } from "../../billing/stripeGuard.js";
+import { idParam } from "../../schemas.js";
 
 const SESSION_PARAM = "shop_session";
 const CANCELED_PARAM = "shop_canceled";

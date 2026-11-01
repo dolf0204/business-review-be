@@ -1,5 +1,5 @@
 import { buildApp } from "./app.js";
-import { resumeCampaigns } from "./lib/campaignSend.js";
+import { resumeCampaigns } from "./lib/engage/campaignSend.js";
 import { config } from "./config.js";
 
 const app = await buildApp();

@@ -2,9 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 const { updateMany, findMany } = vi.hoisted(() => ({ updateMany: vi.fn(), findMany: vi.fn() }));
 
-vi.mock("../src/db.js", () => ({ prisma: { business: { updateMany, findMany } } }));
+vi.mock("../../../src/db.js", () => ({ prisma: { business: { updateMany, findMany } } }));
 
-import { SLUG_RESULT, claimSlug, pickFreeSlugs, takenSlugs } from "../src/lib/slugs.js";
+import { SLUG_RESULT, claimSlug, pickFreeSlugs, takenSlugs } from "../../../src/lib/slug/slugs.js";
 
 const restaurant = { name: "Točkica", kind: "restaurant", address: "Maceljska ul. 21, 10000, Zagreb, Croatia", lang: "hr" };
 const takenBy = (...used: string[]) => async (slugs: string[]) => new Set(slugs.filter((s) => used.includes(s)));

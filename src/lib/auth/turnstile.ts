@@ -1,4 +1,4 @@
-import { config } from "../config.js";
+import { config } from "../../config.js";
 
 /**
  * Checks a Cloudflare Turnstile token. With no secret configured it only passes outside production,

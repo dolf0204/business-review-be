@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn(), findUnique: vi.fn() },
@@ -10,12 +10,12 @@ const db = vi.hoisted(() => ({
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
-import { buildApp } from "../src/app.js";
-import { config } from "../src/config.js";
-import { staffCode, utcDay } from "../src/lib/loyalty.js";
-import { couponOpen } from "../src/routes/coupons.js";
+import { buildApp } from "../../../src/app.js";
+import { config } from "../../../src/config.js";
+import { staffCode, utcDay } from "../../../src/lib/engage/loyalty.js";
+import { couponOpen } from "../../../src/routes/engage/coupons.js";
 
 const B = "11111111-1111-4111-8111-111111111111";
 const C = "44444444-4444-4444-8444-444444444444";

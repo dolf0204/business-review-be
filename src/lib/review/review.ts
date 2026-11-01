@@ -1,12 +1,12 @@
 import type { FastifyBaseLogger } from "fastify";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import type { Business, Coupon } from "../generated/prisma/client.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import type { Business, Coupon } from "../../generated/prisma/client.js";
 import { takeCheckSlot } from "./checkLimit.js";
 import { checkBusinessContent, checkCouponContent, checkSpelling, contentCheckEnabled } from "./contentCheck.js";
-import { sendMail } from "./mail.js";
+import { sendMail } from "../mail/mail.js";
 import { acceptableFixes, type Fixes } from "./textFixes.js";
-import { couponReviewKey, couponReviewMail, operatorList, reviewKey, reviewMail } from "./operator.js";
+import { couponReviewKey, couponReviewMail, operatorList, reviewKey, reviewMail } from "../links/operator.js";
 
 type Log = Pick<FastifyBaseLogger, "info" | "warn" | "error">;
 

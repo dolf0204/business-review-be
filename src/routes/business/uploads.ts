@@ -4,9 +4,9 @@ import { mkdir, stat, unlink, writeFile } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import multipart from "@fastify/multipart";
 import type { FastifyInstance } from "fastify";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { ImageError, MAX_UPLOAD_BYTES, processImage } from "../lib/image.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { ImageError, MAX_UPLOAD_BYTES, processImage } from "../../lib/media/image.js";
 
 export const STORAGE_LIMIT_BYTES = 30 * 1024 * 1024;
 const FILE_NAME = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.webp$/;

@@ -1,12 +1,12 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findFirst: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
   businessSubscription: { findUnique: vi.fn(), upsert: vi.fn() },
   user: { findUniqueOrThrow: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
 const stripeApi = vi.hoisted(() => ({
   customers: { create: vi.fn() },
@@ -27,10 +27,10 @@ vi.mock("stripe", () => {
   return { default: Stripe };
 });
 
-import { buildApp } from "../src/app.js";
-import { clearPriceCache, syncSubscription } from "../src/billing/stripe.js";
-import { statusFromStripe } from "../src/billing/map.js";
-import { isLive } from "../src/lib/live.js";
+import { buildApp } from "../../../src/app.js";
+import { clearPriceCache, syncSubscription } from "../../../src/billing/stripe.js";
+import { statusFromStripe } from "../../../src/billing/map.js";
+import { isLive } from "../../../src/lib/business/live.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const FUTURE = new Date(Date.now() + 30 * 86_400_000);

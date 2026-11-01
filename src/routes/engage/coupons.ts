@@ -1,14 +1,14 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { isLive } from "../lib/live.js";
-import { isStaffCode, staffCode, utcDay, windowState } from "../lib/loyalty.js";
-import { reviewCoupon } from "../lib/review.js";
-import { idParam } from "../schemas.js";
-import { guestOf } from "./guests.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { isLive } from "../../lib/business/live.js";
+import { isStaffCode, staffCode, utcDay, windowState } from "../../lib/engage/loyalty.js";
+import { reviewCoupon } from "../../lib/review/review.js";
+import { idParam } from "../../schemas.js";
+import { guestOf } from "../public/guests.js";
 
 export const MAX_COUPONS_PER_BUSINESS = 10;
 const code = z.string().min(4).max(32);

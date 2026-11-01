@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { boundingBox, distanceKm } from "../src/lib/geo.js";
-import { newCode } from "../src/lib/code.js";
+import { boundingBox, distanceKm } from "../../../src/lib/places/geo.js";
+import { newCode } from "../../../src/lib/business/code.js";
 
 const zadar = { lat: 44.1194, lng: 15.2314 };
 const split = { lat: 43.5081, lng: 16.4402 };

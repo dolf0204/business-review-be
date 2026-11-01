@@ -1,4 +1,4 @@
-import { type Kind, UI_LANGS } from "../schemas.js";
+import { type Kind, UI_LANGS } from "../../schemas.js";
 
 export type UiLang = (typeof UI_LANGS)[number];
 

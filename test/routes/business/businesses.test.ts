@@ -1,20 +1,20 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findMany: vi.fn(), findFirst: vi.fn(), create: vi.fn(), update: vi.fn(), count: vi.fn(), deleteMany: vi.fn() },
   user: { findUnique: vi.fn() },
 }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const slug = vi.hoisted(() => ({ settleSlug: vi.fn<() => Promise<string | null>>(async () => "tockica") }));
-vi.mock("../src/lib/slugLock.js", () => slug);
+vi.mock("../../../src/lib/slug/slugLock.js", () => slug);
 const places = vi.hoisted(() => ({ findPlaces: vi.fn(), placeDetails: vi.fn() }));
-vi.mock("../src/lib/googlePlaces.js", async (orig) => ({ ...(await orig<typeof import("../src/lib/googlePlaces.js")>()), ...places }));
+vi.mock("../../../src/lib/places/googlePlaces.js", async (orig) => ({ ...(await orig<typeof import("../../../src/lib/places/googlePlaces.js")>()), ...places }));
 
-import { buildApp } from "../src/app.js";
-import { PlacesError } from "../src/lib/googlePlaces.js";
+import { buildApp } from "../../../src/app.js";
+import { PlacesError } from "../../../src/lib/places/googlePlaces.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({

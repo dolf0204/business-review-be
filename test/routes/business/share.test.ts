@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({ business: { findFirst: vi.fn(), findUnique: vi.fn() }, post: { findMany: vi.fn() }, loyaltyProgram: { findUnique: vi.fn() }, coupon: { findMany: vi.fn() } }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
-import { buildApp } from "../src/app.js";
-import { shareUrl } from "../src/lib/code.js";
+import { buildApp } from "../../../src/app.js";
+import { shareUrl } from "../../../src/lib/business/code.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const row = (over = {}) => ({

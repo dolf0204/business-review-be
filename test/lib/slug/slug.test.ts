@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { KINDS, UI_LANGS } from "../src/schemas.js";
-import { SLUG_MAX_LENGTH, cityFromAddress, isReservedSlug, isValidSlug, numberedSlug, slugCandidates, slugify, typeWord } from "../src/lib/slug.js";
+import { KINDS, UI_LANGS } from "../../../src/schemas.js";
+import { SLUG_MAX_LENGTH, cityFromAddress, isReservedSlug, isValidSlug, numberedSlug, slugCandidates, slugify, typeWord } from "../../../src/lib/slug/slug.js";
 
 describe("slugify", () => {
   it("turns names into plain lowercase words joined by hyphens", () => {

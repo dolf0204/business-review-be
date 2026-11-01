@@ -1,19 +1,19 @@
 import argon2 from "argon2";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   user: { findUnique: vi.fn(), create: vi.fn(), update: vi.fn(), findUniqueOrThrow: vi.fn() },
   authToken: { create: vi.fn(), findUnique: vi.fn(), update: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
 const captcha = vi.hoisted(() => ({ verifyTurnstile: vi.fn() }));
-vi.mock("../src/lib/turnstile.js", () => captcha);
+vi.mock("../../../src/lib/auth/turnstile.js", () => captcha);
 
-import { buildApp } from "../src/app.js";
-import { hashToken } from "../src/lib/tokens.js";
+import { buildApp } from "../../../src/app.js";
+import { hashToken } from "../../../src/lib/auth/tokens.js";
 
 async function call(method: "GET" | "POST", url: string, payload?: object, cookie?: string) {
   const app = await buildApp();

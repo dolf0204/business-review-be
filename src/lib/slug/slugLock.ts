@@ -1,5 +1,5 @@
-import { prisma } from "../db.js";
-import type { Business } from "../generated/prisma/client.js";
+import { prisma } from "../../db.js";
+import type { Business } from "../../generated/prisma/client.js";
 import { SLUG_RESULT, claimSlug, freeSlugsFor } from "./slugs.js";
 
 const CLAIM_ATTEMPTS = 5;

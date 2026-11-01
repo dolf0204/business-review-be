@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildSiteUrl, buildSlugOrigin, siteUrl, slugOrigin } from "../src/lib/siteUrl.js";
+import { buildSiteUrl, buildSlugOrigin, siteUrl, slugOrigin } from "../../../src/lib/business/siteUrl.js";
 
 describe("buildSiteUrl", () => {
   it("puts the address in front of the base domain and takes the scheme from the app", () => {

@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
-import { hintFromMapsUrl, parseMapsLink } from "../src/lib/mapsUrl.js";
+import { hintFromMapsUrl, parseMapsLink } from "../../../src/lib/places/mapsUrl.js";
 
-vi.mock("../src/db.js", () => ({ prisma: {} }));
+vi.mock("../../../src/db.js", () => ({ prisma: {} }));
 
-import { expandMapsLink } from "../src/lib/googlePlaces.js";
+import { expandMapsLink } from "../../../src/lib/places/googlePlaces.js";
 
 describe("pasted Google Maps links", () => {
   it("accepts Google's own https addresses only", () => {

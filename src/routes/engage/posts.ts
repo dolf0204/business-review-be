@@ -1,9 +1,9 @@
 import type { FastifyInstance } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { idParam } from "../schemas.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { idParam } from "../../schemas.js";
 
 export const MAX_POSTS_PER_BUSINESS = 20;
 

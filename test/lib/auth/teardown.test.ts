@@ -1,6 +1,6 @@
 import argon2 from "argon2";
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   user: { findUnique: vi.fn(), delete: vi.fn() },
@@ -8,9 +8,9 @@ const db = vi.hoisted(() => ({
   upload: { findMany: vi.fn(), deleteMany: vi.fn() },
   businessSubscription: { findMany: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
 const fsApi = vi.hoisted(() => ({ unlink: vi.fn() }));
 vi.mock("node:fs/promises", async (orig) => ({ ...(await orig<typeof import("node:fs/promises")>()), unlink: fsApi.unlink }));
 const stripeApi = vi.hoisted(() => ({ subscriptions: { cancel: vi.fn() } }));
@@ -32,7 +32,7 @@ vi.mock("stripe", () => {
 });
 
 import Stripe from "stripe";
-import { buildApp } from "../src/app.js";
+import { buildApp } from "../../../src/app.js";
 
 const BID = "11111111-1111-4111-8111-111111111111";
 const FILE = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa.webp";

@@ -4,13 +4,13 @@ const db = vi.hoisted(() => ({
   business: { findUnique: vi.fn(), update: vi.fn() },
   user: { findUnique: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 const mail = vi.hoisted(() => ({ sendMail: vi.fn() }));
-vi.mock("../src/lib/mail.js", () => mail);
+vi.mock("../../../src/lib/mail/mail.js", () => mail);
 
-import { buildApp } from "../src/app.js";
-import { config } from "../src/config.js";
-import { isReviewKey, operatorList, reviewKey, reviewMail } from "../src/lib/operator.js";
+import { buildApp } from "../../../src/app.js";
+import { config } from "../../../src/config.js";
+import { isReviewKey, operatorList, reviewKey, reviewMail } from "../../../src/lib/links/operator.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const key = () => reviewKey(ID, config.JWT_SECRET);

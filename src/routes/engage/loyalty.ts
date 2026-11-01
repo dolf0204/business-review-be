@@ -1,13 +1,13 @@
 import type { FastifyInstance, FastifyRequest } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
-import { ownedBusiness } from "../lib/access.js";
-import { cardExpired, cardExpiry, DEFAULT_RADIUS_METERS, distanceMeters, isNearEnough, isStaffCode, MAX_CARD_VALID_DAYS, staffCode, utcDay, windowState } from "../lib/loyalty.js";
-import { idParam } from "../schemas.js";
-import { guestOf } from "./guests.js";
-import { isLive } from "../lib/live.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
+import { ownedBusiness } from "../../lib/auth/access.js";
+import { cardExpired, cardExpiry, DEFAULT_RADIUS_METERS, distanceMeters, isNearEnough, isStaffCode, MAX_CARD_VALID_DAYS, staffCode, utcDay, windowState } from "../../lib/engage/loyalty.js";
+import { idParam } from "../../schemas.js";
+import { guestOf } from "../public/guests.js";
+import { isLive } from "../../lib/business/live.js";
 
 const code = z.string().min(4).max(32);
 const date = z.coerce.date().nullable().optional();

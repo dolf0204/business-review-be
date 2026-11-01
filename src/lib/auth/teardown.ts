@@ -1,9 +1,9 @@
 import { unlink } from "node:fs/promises";
 import { join, resolve } from "node:path";
 import Stripe from "stripe";
-import { billingConfigured, stripe } from "../billing/stripe.js";
-import { config } from "../config.js";
-import { prisma } from "../db.js";
+import { billingConfigured, stripe } from "../../billing/stripe.js";
+import { config } from "../../config.js";
+import { prisma } from "../../db.js";
 
 /**
  * Ends the Stripe subscriptions of these businesses at once. This has to succeed before any data is deleted:

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { SESSION_COOKIE } from "../src/lib/sessionCookie.js";
+import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({
   business: { findUnique: vi.fn(), findFirst: vi.fn() },
@@ -10,10 +10,10 @@ const db = vi.hoisted(() => ({
   loyaltyCard: { count: vi.fn() },
   couponUse: { count: vi.fn() },
 }));
-vi.mock("../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/db.js", () => ({ prisma: db }));
 
-import { buildApp } from "../src/app.js";
-import { isNewVisitDay, nextStep, platformState } from "../src/lib/reviews.js";
+import { buildApp } from "../../../src/app.js";
+import { isNewVisitDay, nextStep, platformState } from "../../../src/lib/review/reviews.js";
 
 describe("when to ask for a review", () => {
   it("asks a new guest, never asks again after the link was followed", () => {

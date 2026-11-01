@@ -1,4 +1,4 @@
-import type { Business } from "../generated/prisma/client.js";
+import type { Business } from "../../generated/prisma/client.js";
 import { siteUrl } from "./siteUrl.js";
 
 export const MAX_BUSINESSES_PER_OWNER = 5;

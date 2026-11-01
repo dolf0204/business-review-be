@@ -1,12 +1,12 @@
 import type { FastifyInstance, FastifyReply } from "fastify";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { prisma } from "../db.js";
-import type { Business } from "../generated/prisma/client.js";
-import { isLive } from "../lib/live.js";
-import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "../lib/slug.js";
-import { couponOpen } from "./coupons.js";
-import { publicBusiness } from "../lib/businessView.js";
+import { prisma } from "../../db.js";
+import type { Business } from "../../generated/prisma/client.js";
+import { isLive } from "../../lib/business/live.js";
+import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from "../../lib/slug/slug.js";
+import { couponOpen } from "../engage/coupons.js";
+import { publicBusiness } from "../../lib/business/businessView.js";
 
 const PAGE_LIMIT = { max: 120, timeWindow: "1 minute" };
 
