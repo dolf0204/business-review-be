@@ -17,7 +17,6 @@ import { loyaltyRoutes } from "./routes/engage/loyalty.js";
 import { uploadRoutes } from "./routes/business/uploads.js";
 import { expandMedia } from "./lib/media/media.js";
 import { billingRoutes, stripeWebhookRoutes } from "./routes/account/billing.js";
-import { kitRoutes } from "./routes/shop/kit.js";
 import { shopRoutes } from "./routes/shop/shop.js";
 import { couponRoutes } from "./routes/engage/coupons.js";
 import { postRoutes } from "./routes/engage/posts.js";
@@ -106,7 +105,6 @@ export async function buildApp() {
   await app.register(operatorRoutes);
   await app.register(uploadRoutes);
   await app.register(billingRoutes);
-  await app.register(kitRoutes);
   await app.register(shopRoutes);
   await app.register(couponRoutes);
   await app.register(stripeWebhookRoutes);

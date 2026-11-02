@@ -105,6 +105,8 @@ describe("placing an order", () => {
     const session = stripeApi.checkout.sessions.create.mock.calls[0]![0];
     expect(session.mode).toBe("payment");
     expect(session.metadata).toEqual({ shopOrderId: OID });
+    expect(session.success_url).toBe(`http://localhost:5190/shop?business=${ID}&shop_session={CHECKOUT_SESSION_ID}&order=${OID}`);
+    expect(session.cancel_url).toBe(`http://localhost:5190/shop?business=${ID}&shop_canceled=1`);
     expect(session.line_items.map((l: { price_data: { unit_amount: number } }) => l.price_data.unit_amount)).toEqual([1875]);
     expect(db.shopOrder.update.mock.calls[0]![0].data).toEqual({ stripeSessionId: "cs_test_12345" });
     expect(mail.sendMail).not.toHaveBeenCalled();

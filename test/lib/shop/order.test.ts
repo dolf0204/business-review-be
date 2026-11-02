@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { freePeriodEnd, isShopKey, priceOrder, shopKey, shopOperatorMail, type ShopItemInput } from "../../../src/lib/shop/order.js";
-import { DESIGN_IDS, DESIGNS, FINISHES, publicCatalog, SIZE_PRICE_CENTS } from "../../../src/lib/shop/catalog.js";
+import { DESIGN_IDS, DESIGNS, FINISHES, publicCatalog, shipCountries, SIZE_PRICE_CENTS } from "../../../src/lib/shop/catalog.js";
 
 const item = (size: ShopItemInput["size"], printText = "Salon Lana"): ShopItemInput => ({ design: "halo", finish: "amber", size, printText });
 const NOW = new Date("2026-11-01T12:00:00Z");
@@ -13,6 +13,9 @@ describe("catalog", () => {
     expect(SIZE_PRICE_CENTS).toEqual({ S: 2000, M: 2500, L: 3000 });
     expect(publicCatalog().chapters.map((c) => c.designs.length)).toEqual([4, 4, 3, 3, 2, 4]);
     expect(FINISHES).toHaveLength(3);
+  });
+  it("reads the list of countries, upper case and without junk", () => {
+    expect(shipCountries("hr, de ,XX1,,it,HR")).toEqual(["HR", "DE", "IT"]);
   });
 });
 

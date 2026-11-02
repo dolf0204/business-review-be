@@ -53,3 +53,5 @@ export const publicCatalog = () => ({
   printTextMax: PRINT_TEXT_MAX,
   maxItemsPerOrder: MAX_ITEMS_PER_ORDER,
 });
+
+export const shipCountries = (raw: string) => [...new Set(raw.split(",").map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)))];

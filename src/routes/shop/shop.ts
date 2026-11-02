@@ -5,16 +5,19 @@ import { billingConfigured, stripe } from "../../billing/stripe.js";
 import { config } from "../../config.js";
 import { prisma } from "../../db.js";
 import { ownedBusiness } from "../../lib/auth/access.js";
-import { shipCountries } from "../../lib/shop/kit.js";
 import { sendMail } from "../../lib/mail/mail.js";
 import { freePeriodEnd, isShopKey, priceOrder, shopShippedMail, type PricedOrder } from "../../lib/shop/order.js";
 import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../../lib/shop/fulfil.js";
-import { DESIGN_IDS, FINISHES, MAX_ITEMS_PER_ORDER, PRINT_TEXT_MAX, publicCatalog, SHOP_CURRENCY, SIZES, YEARLY_DISCOUNT_PERCENT } from "../../lib/shop/catalog.js";
+import { DESIGN_IDS, FINISHES, MAX_ITEMS_PER_ORDER, PRINT_TEXT_MAX, publicCatalog, shipCountries, SHOP_CURRENCY, SIZES, YEARLY_DISCOUNT_PERCENT } from "../../lib/shop/catalog.js";
 import { stripeGuard } from "../../billing/stripeGuard.js";
 import { idParam } from "../../schemas.js";
 
+const SHOP_PAGE_PATH = "/shop";
+const BUSINESS_PARAM = "business";
+const ORDER_PARAM = "order";
 const SESSION_PARAM = "shop_session";
 const CANCELED_PARAM = "shop_canceled";
+const CHECKOUT_SESSION_PLACEHOLDER = "{CHECKOUT_SESSION_ID}";
 const UNIQUE_VIOLATION = "P2002";
 
 const text = (max: number) => z.string().trim().min(1).max(max);
@@ -145,8 +148,8 @@ export async function shopRoutes(app: FastifyInstance) {
         client_reference_id: order.id,
         metadata: { [SHOP_ORDER_METADATA]: order.id },
         line_items: lineItems,
-        success_url: `${config.APP_URL}/businesses/${b.id}?${SESSION_PARAM}={CHECKOUT_SESSION_ID}&order=${order.id}`,
-        cancel_url: `${config.APP_URL}/businesses/${b.id}?${CANCELED_PARAM}=1`,
+        success_url: `${config.APP_URL}${SHOP_PAGE_PATH}?${BUSINESS_PARAM}=${b.id}&${SESSION_PARAM}=${CHECKOUT_SESSION_PLACEHOLDER}&${ORDER_PARAM}=${order.id}`,
+        cancel_url: `${config.APP_URL}${SHOP_PAGE_PATH}?${BUSINESS_PARAM}=${b.id}&${CANCELED_PARAM}=1`,
       });
       await prisma.shopOrder.update({ where: { id: order.id }, data: { stripeSessionId: session.id } });
       return reply.code(201).send({ id: order.id, url: session.url });
