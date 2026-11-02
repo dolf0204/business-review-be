@@ -1,9 +1,12 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { esc } from "../mail/layout.js";
 import { SHIPPING_CENTS, SIZE_PRICE_CENTS, YEARLY_DISCOUNT_PERCENT, type ShopDesignId, type ShopFinish, type ShopSize } from "./catalog.js";
 
-const esc = (s: string) => s.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]!);
+const ORDER_REF_LENGTH = 8;
 
 export const euro = (cents: number) => `${(cents / 100).toFixed(2)} EUR`;
+
+export const orderRef = (orderId: string) => orderId.replace(/-/g, "").slice(0, ORDER_REF_LENGTH).toUpperCase();
 
 export interface ShopItemInput {
   design: ShopDesignId;
@@ -75,6 +78,7 @@ export interface MailItem {
 }
 
 export interface ShopMailInput {
+  orderId: string;
   business: string;
   ownerEmail: string;
   items: readonly MailItem[];
@@ -98,11 +102,11 @@ const itemLine = (i: MailItem) =>
 export function shopOperatorMail(i: ShopMailInput) {
   const money = i.totalCents === 0 ? "Nothing to invoice, the whole order is free with the yearly plan." : i.paidOnline ? `Paid online: ${euro(i.totalCents)}. Issue the invoice in eRacuni.` : `Total: ${euro(i.totalCents)}.`;
   return {
-    subject: `Stand order: ${i.business}`,
+    subject: `Stand order #${orderRef(i.orderId)}: ${i.business}`,
     html: `<p>A business ordered handmade stands.</p>
 <h3>Make</h3>
 <ul>${i.items.map(itemLine).join("")}</ul>
-<p>QR code: see the attached PNG (print) and SVG (vector). It opens <code>${esc(i.qrUrl)}</code></p>
+<p>QR code: see the attached PNG (2000 px, for print). It opens <code>${esc(i.qrUrl)}</code></p>
 <h3>Write on the NFC tag</h3>
 <p>One URL record: <code>${esc(i.nfcUrl)}</code></p>
 <h3>Money</h3>
@@ -113,13 +117,3 @@ export function shopOperatorMail(i: ShopMailInput) {
 <p><a href="${esc(i.link)}">When it is posted, open this and mark it as posted</a> (the owner is told, with the tracking link if you add one).</p>`,
   };
 }
-
-export const shopOwnerReceivedMail = (business: string, count: number, totalCents: number) => ({
-  subject: `We got your stand order: ${business}`,
-  html: `<p>Thank you! We will handmake ${count} stand${count === 1 ? "" : "s"} for <strong>${esc(business)}</strong>, sign ${count === 1 ? "it" : "them"} with the B-ask mark and post ${count === 1 ? "it" : "them"} to the address you gave. Total: ${esc(euro(totalCents))}. We will email you when ${count === 1 ? "it is" : "they are"} on the way.</p>`,
-});
-
-export const shopShippedMail = (business: string, trackingUrl: string | null) => ({
-  subject: `Your stand is on its way: ${business}`,
-  html: `<p>The handmade stand order for <strong>${esc(business)}</strong> is posted.${trackingUrl ? ` You can follow it here: <a href="${esc(trackingUrl)}">${esc(trackingUrl)}</a>` : ""}</p>`,
-});

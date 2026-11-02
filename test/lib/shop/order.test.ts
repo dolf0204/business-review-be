@@ -64,8 +64,8 @@ describe("keys and mail", () => {
   });
   it("escapes everything the owner typed and says what to invoice", () => {
     const priced = priceOrder([item("L", "<script>x</script>")], { yearly: true, freeAvailable: false });
-    const m = shopOperatorMail({
-      business: "<b>K</b>", ownerEmail: "o@example.com", items: priced.items, totalCents: priced.totalCents, paidOnline: true, name: "A & B", line1: "Obala 1", line2: null,
+      const m = shopOperatorMail({
+      orderId: "45e51044-ee43-4b75-87e4-de2dbadf8686", business: "<b>K</b>", ownerEmail: "o@example.com", items: priced.items, totalCents: priced.totalCents, paidOnline: true, name: "A & B", line1: "Obala 1", line2: null,
       postalCode: "1", city: "Z", country: "HR", phone: null, qrUrl: "https://x/b/c?s=q", nfcUrl: "https://x/b/c?s=n", link: "https://x/op?o=1&key=2",
     });
     expect(m.html).not.toContain("<script>");

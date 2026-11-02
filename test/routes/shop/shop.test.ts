@@ -45,8 +45,8 @@ async function owner(method: "GET" | "POST", url: string, payload?: object) {
 }
 
 const orderRow = (over = {}) => ({
-  id: OID, status: "PENDING_PAYMENT", totalCents: 2500, name: "Ana", line1: "Obala 1", line2: null, postalCode: "23000", city: "Zadar", country: "HR", phone: null,
-  items: [{ design: "halo", finish: "amber", size: "M", printText: "Salon Lana", unitCents: 2500 }], business: { ...BIZ, owner: { email: "owner@example.com" } }, ...over,
+  id: OID, status: "PENDING_PAYMENT", subtotalCents: 2500, shippingCents: 0, totalCents: 2500, createdAt: new Date("2026-11-02T12:00:00Z"), name: "Ana", line1: "Obala 1", line2: null, postalCode: "23000", city: "Zadar", country: "HR", phone: null,
+  items: [{ design: "halo", finish: "amber", size: "M", printText: "Salon Lana", listCents: 2500, unitCents: 2500 }], business: { ...BIZ, owner: { email: "owner@example.com" } }, ...over,
 });
 
 beforeEach(() => {
@@ -119,7 +119,7 @@ describe("placing an order", () => {
     expect(stripeApi.checkout.sessions.create).not.toHaveBeenCalled();
     const toMaker = mail.sendMail.mock.calls[0]![0];
     expect(toMaker.to).toBe("kits@example.com");
-    expect(toMaker.attachments.map((a: { name: string }) => a.name)).toEqual(["qr-abcd2345.png", "qr-abcd2345.svg"]);
+    expect(toMaker.attachments.map((a: { name: string }) => a.name)).toEqual(["qr-abcd2345.png"]);
     expect(toMaker.html).toContain("FREE, yearly plan");
     expect(toMaker.html).toContain("http://localhost:5190/b/abcd2345?s=n");
     expect(toMaker.html).not.toContain("<Lana>");

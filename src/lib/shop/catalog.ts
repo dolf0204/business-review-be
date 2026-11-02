@@ -38,6 +38,38 @@ export type ShopDesignId = (typeof DESIGNS)[number]["id"];
 
 export const DESIGN_IDS = DESIGNS.map((d) => d.id) as [ShopDesignId, ...ShopDesignId[]];
 
+export const DESIGN_LABELS = {
+  bottle: "Bottle",
+  neon: "Neon sign",
+  coasters: "Coaster",
+  coasterset: "Coaster set",
+  cloche: "Cloche",
+  plateStand: "Plate stand",
+  bowl: "Bowl",
+  easel: "Easel",
+  board: "Board",
+  chopBlock: "Chopping block",
+  cleaver: "Cleaver",
+  pole: "Barber pole",
+  comb: "Comb",
+  halo: "Halo",
+  bone: "Bone",
+  paw: "Paw",
+  slab: "Slab",
+  bloom: "Bloom",
+  hook: "Hook",
+  arch: "Arch",
+} as const satisfies Record<ShopDesignId, string>;
+
+export const FINISH_LABELS = { midnight: "Midnight", amber: "Amber", ivory: "Ivory" } as const satisfies Record<ShopFinish, string>;
+
+export const FINISH_COLORS = { midnight: "#39ff88", amber: "#ffb347", ivory: "#f4f4f2" } as const satisfies Record<ShopFinish, string>;
+
+export const SHOP_IMAGE_DIR = "/shop";
+
+export const shopImageUrl = (appUrl: string, design: string, finish: string) =>
+  `${appUrl.replace(/\/+$/, "")}${SHOP_IMAGE_DIR}/${design}_${Math.max(0, FINISHES.findIndex((f) => f === finish))}.jpg`;
+
 export const YEARLY_DISCOUNT_PERCENT = 25;
 export const SHIPPING_CENTS = 0;
 export const PRINT_TEXT_MAX = 32;

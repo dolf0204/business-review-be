@@ -3,7 +3,8 @@ import { config } from "../../config.js";
 import { prisma } from "../../db.js";
 import { shareUrl } from "../business/code.js";
 import { sendMail } from "../mail/mail.js";
-import { shopKey, shopOperatorMail, shopOwnerReceivedMail } from "./order.js";
+import { shopKey, shopOperatorMail } from "./order.js";
+import { shopOwnerReceivedMail } from "./shopMail.js";
 
 export const SHOP_ORDER_METADATA = "shopOrderId";
 
@@ -31,8 +32,9 @@ export async function fulfilShopOrder(orderId: string, log: ShopLog, paidCents?:
     const qrUrl = shareUrl(config.APP_URL, b.code, "qr");
     const nfcUrl = shareUrl(config.APP_URL, b.code, "nfc");
     const opts = { errorCorrectionLevel: "M" as const, margin: 2 };
-    const [png, svg] = await Promise.all([QRCode.toBuffer(qrUrl, { ...opts, width: 2000 }), QRCode.toString(qrUrl, { ...opts, type: "svg", width: 1000 })]);
+    const png = await QRCode.toBuffer(qrUrl, { ...opts, width: 2000 });
     const mail = shopOperatorMail({
+      orderId: order.id,
       business: b.name,
       ownerEmail,
       items: order.items.map((i) => ({ design: i.design, finish: i.finish, size: i.size, printText: i.printText, unitCents: i.unitCents, free: i.unitCents === 0 })),
@@ -49,10 +51,34 @@ export async function fulfilShopOrder(orderId: string, log: ShopLog, paidCents?:
       nfcUrl,
       link: `${config.APP_URL}/operator/shop?o=${order.id}&key=${shopKey(order.id, config.JWT_SECRET)}`,
     });
-    await sendMail({ to: config.KIT_ORDER_EMAIL, ...mail, attachments: [{ name: `qr-${b.code}.png`, content: png }, { name: `qr-${b.code}.svg`, content: Buffer.from(svg) }] }, log);
-    await sendMail({ to: ownerEmail, ...shopOwnerReceivedMail(b.name, order.items.length, order.totalCents) }, log);
+    await sendMail({ to: config.KIT_ORDER_EMAIL, ...mail, attachments: [{ name: `qr-${b.code}.png`, content: png }] }, log);
   } catch (err) {
-    log.error({ err: (err as Error).message, orderId }, "shop order email could not be sent");
+    log.error({ err: (err as Error).message, orderId }, "shop order email to the maker could not be sent");
+  }
+
+  try {
+    const mail = shopOwnerReceivedMail({
+      appUrl: config.APP_URL,
+      orderId: order.id,
+      businessId: b.id,
+      business: b.name,
+      createdAt: order.createdAt,
+      items: order.items.map((i) => ({ design: i.design, finish: i.finish, size: i.size, printText: i.printText, listCents: i.listCents, unitCents: i.unitCents })),
+      subtotalCents: order.subtotalCents,
+      shippingCents: order.shippingCents,
+      totalCents: order.totalCents,
+      paidOnline: order.totalCents > 0,
+      name: order.name,
+      line1: order.line1,
+      line2: order.line2,
+      postalCode: order.postalCode,
+      city: order.city,
+      country: order.country,
+      phone: order.phone,
+    });
+    await sendMail({ to: ownerEmail, ...mail, ...(config.KIT_ORDER_EMAIL ? { replyTo: config.KIT_ORDER_EMAIL } : {}) }, log);
+  } catch (err) {
+    log.error({ err: (err as Error).message, orderId }, "shop order email to the customer could not be sent");
   }
   return true;
 }
