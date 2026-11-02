@@ -22,6 +22,13 @@ async function call(method: "GET" | "POST", url: string, payload?: object, cooki
   return res;
 }
 
+async function me(sub: string) {
+  const app = await buildApp();
+  const res = await app.inject({ method: "GET", url: "/auth/me", headers: { cookie: `${SESSION_COOKIE}=${app.jwt.sign({ sub })}` } });
+  await app.close();
+  return res;
+}
+
 describe("sign up and sign in", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -107,5 +114,21 @@ describe("sign up and sign in", () => {
 
   it("keeps /auth/me closed without a session", async () => {
     expect((await call("GET", "/auth/me")).statusCode).toBe(401);
+  });
+
+  it("shows the signed-in owner at /auth/me", async () => {
+    const profile = { id: "u1", email: "a@example.com", name: "Ana", uiLang: "hr" };
+    db.user.findUnique.mockResolvedValue(profile);
+    const res = await me("u1");
+    expect(res.statusCode).toBe(200);
+    expect(res.json()).toEqual(profile);
+  });
+
+  it("answers 401 and clears the cookie when the session belongs to an account that no longer exists", async () => {
+    db.user.findUnique.mockResolvedValue(null);
+    const res = await me("deleted-user");
+    expect(res.statusCode).toBe(401);
+    expect(res.json()).toEqual({ error: "unauthenticated" });
+    expect(String(res.headers["set-cookie"])).toMatch(new RegExp(`${SESSION_COOKIE}=;`));
   });
 });

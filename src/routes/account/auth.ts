@@ -14,6 +14,7 @@ import { SESSION_COOKIE } from "../../lib/auth/sessionCookie.js";
 import { UI_LANGS } from "../../schemas.js";
 
 const DAY = 24 * 60 * 60 * 1000;
+const UNAUTHENTICATED = "unauthenticated";
 const email = z.string().trim().toLowerCase().pipe(z.email());
 const password = z.string().min(8).max(200);
 
@@ -128,7 +129,12 @@ export async function authRoutes(app: FastifyInstance) {
     return { ok: true };
   });
 
-  r.get("/auth/me", { onRequest: [app.authenticate] }, async (req) =>
-    prisma.user.findUniqueOrThrow({ where: { id: req.user.sub }, select: { id: true, email: true, name: true, uiLang: true } }),
-  );
+  r.get("/auth/me", { onRequest: [app.authenticate] }, async (req, reply) => {
+    const user = await prisma.user.findUnique({ where: { id: req.user.sub }, select: { id: true, email: true, name: true, uiLang: true } });
+    if (!user) {
+      reply.clearCookie(SESSION_COOKIE, { path: "/" });
+      return reply.code(401).send({ error: UNAUTHENTICATED });
+    }
+    return user;
+  });
 }
