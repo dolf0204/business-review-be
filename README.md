@@ -43,6 +43,30 @@ Two environments, two commands, no commenting in and out:
 
 Copy `.env.dev.example` / `.env.stage.example`. The `.env*` files are git-ignored; never commit or paste keys.
 
+## See the database
+
+The local database is the PostgreSQL container from the command above. First check its port: `docker ps --format "table {{.Names}}\t{{.Ports}}"`
+(the number before `->5432`). It must match the port in `DATABASE_URL` of `.env.dev`.
+
+**DBeaver** (install on Windows: `winget install DBeaver.DBeaver.Community`; on Ubuntu: `sudo snap install dbeaver-ce`):
+
+| Field | Value |
+| --- | --- |
+| Database | New Database Connection, PostgreSQL |
+| Host | `localhost` |
+| Port | `5433` with the docker command above (`5432` if your `DATABASE_URL` says so) |
+| Database | `brev` |
+| Username / Password | `brev` / `brev` |
+
+Click Test Connection (accept the driver download), then Finish. The tables are under `brev > Databases > brev > Schemas > public > Tables`;
+orders are in `ShopOrder` and `ShopOrderItem`.
+
+**No install:** `npx prisma studio` opens a table browser in the web browser.
+
+**Terminal:** `docker exec -it brev-pg psql -U brev -d brev`, then for example `SELECT id, status, "trackingUrl" FROM "ShopOrder";`.
+
+Change data in DBeaver only for testing, and never against the production database.
+
 ### Scripts
 
 | Script | Does |
