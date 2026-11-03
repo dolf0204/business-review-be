@@ -121,7 +121,7 @@ describe("sign up and sign in", () => {
     db.user.findUnique.mockResolvedValue(profile);
     const res = await me("u1");
     expect(res.statusCode).toBe(200);
-    expect(res.json()).toEqual(profile);
+    expect(res.json()).toEqual({ ...profile, isOperator: false });
   });
 
   it("answers 401 and clears the cookie when the session belongs to an account that no longer exists", async () => {

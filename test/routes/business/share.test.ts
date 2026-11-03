@@ -3,6 +3,10 @@ import { SESSION_COOKIE } from "../../../src/lib/auth/sessionCookie.js";
 
 const db = vi.hoisted(() => ({ business: { findFirst: vi.fn(), findUnique: vi.fn() }, post: { findMany: vi.fn() }, loyaltyProgram: { findUnique: vi.fn() }, coupon: { findMany: vi.fn() } }));
 vi.mock("../../../src/db.js", () => ({ prisma: db }));
+vi.mock("../../../src/config.js", async (original) => {
+  const actual = await original<typeof import("../../../src/config.js")>();
+  return { ...actual, config: { ...actual.config, SLUG_BASE_DOMAIN: "businessask.eu", APP_URL: "https://businessask.eu" } };
+});
 
 import { buildApp } from "../../../src/app.js";
 import { shareUrl } from "../../../src/lib/business/code.js";
@@ -12,7 +16,7 @@ const row = (over = {}) => ({
   id: ID, ownerId: "u1", code: "abcd2345", name: "Konoba Ribar", kind: "restaurant", subtitle: "Fresh fish", offerText: "10% off", address: "Obala 1, Zadar",
   lat: 44.12, lng: 15.23, googlePlaceId: "ChIJ1", googleMapsUrl: "https://maps.google.com/?cid=1", googleReviewUrl: "https://g.page/r/x/review",
   tripadvisorReviewUrl: null, websiteUrl: "https://k.example.com", instagramUrl: null, facebookUrl: null, phone: "023 1", contactEmail: null, logoUrl: null, backgroundUrl: null,
-  rating: 4.7, ratingCount: 300, theme: { template: "warm" }, publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), ...over,
+  rating: 4.7, ratingCount: 300, theme: { template: "warm" }, slug: "ribar", slugLockedAt: new Date(), publishedAt: new Date(), paidUntil: new Date(Date.now() + 86_400_000), ...over,
 });
 
 async function owner(url: string) {
@@ -34,9 +38,16 @@ describe("QR code and NFC address", () => {
     expect(shareUrl("https://businessask.eu", "abcd2345", "nfc")).toBe("https://businessask.eu/b/abcd2345?s=n");
   });
 
-  it("gives the owner the two addresses", async () => {
+  it("gives the owner the business address with a hint of how it was opened", async () => {
     const res = await owner(`/businesses/${ID}/share`);
-    expect(res.json()).toEqual({ qrUrl: "http://localhost:5190/b/abcd2345?s=q", nfcUrl: "http://localhost:5190/b/abcd2345?s=n" });
+    expect(res.json()).toEqual({ qrUrl: "https://ribar.businessask.eu/?s=q", nfcUrl: "https://ribar.businessask.eu/?s=n" });
+  });
+
+  it("gives no address until the business has been published and has its own address", async () => {
+    db.business.findFirst.mockResolvedValue(row({ slug: null, slugLockedAt: null, publishedAt: null }));
+    const res = await owner(`/businesses/${ID}/share`);
+    expect(res.json()).toEqual({ qrUrl: null, nfcUrl: null });
+    expect((await owner(`/businesses/${ID}/qr`)).statusCode).toBe(409);
   });
 
   it("makes an SVG by default and a PNG on request", async () => {

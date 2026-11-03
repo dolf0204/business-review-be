@@ -5,9 +5,8 @@ import { billingConfigured, stripe } from "../../billing/stripe.js";
 import { config } from "../../config.js";
 import { prisma } from "../../db.js";
 import { ownedBusiness } from "../../lib/auth/access.js";
-import { sendMail } from "../../lib/mail/mail.js";
 import { freePeriodEnd, isShopKey, priceOrder, type PricedOrder } from "../../lib/shop/order.js";
-import { shopShippedMail } from "../../lib/shop/shopMail.js";
+import { notifyShipped } from "../../lib/shop/notifyShipped.js";
 import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../../lib/shop/fulfil.js";
 import { DESIGN_IDS, FINISHES, MAX_ITEMS_PER_ORDER, PRINT_TEXT_MAX, publicCatalog, shipCountries, SHOP_CURRENCY, SIZES, YEARLY_DISCOUNT_PERCENT } from "../../lib/shop/catalog.js";
 import { stripeGuard } from "../../billing/stripeGuard.js";
@@ -192,10 +191,9 @@ export async function shopRoutes(app: FastifyInstance) {
     const o = await prisma.shopOrder.findUnique({ where: { id }, include: { business: { select: { id: true, name: true, ownerId: true } } } });
     if (!o) return reply.code(404).send({ error: "not_found" });
     if (o.status === "PENDING_PAYMENT" || o.status === "CANCELED") return reply.code(409).send({ error: "order_not_paid" });
-    if (o.status !== "SHIPPED") {
+    if (o.status === "PAID") {
       await prisma.shopOrder.update({ where: { id }, data: { status: "SHIPPED", shippedAt: new Date(), trackingUrl: trackingUrl ?? null } });
-      const owner = await prisma.user.findUnique({ where: { id: o.business.ownerId }, select: { email: true } });
-      if (owner) await sendMail({ to: owner.email, ...shopShippedMail({ appUrl: config.APP_URL, orderId: o.id, businessId: o.business.id, business: o.business.name, trackingUrl: trackingUrl ?? null }) }, req.log).catch((err) => req.log.error({ err: (err as Error).message }, "shop shipped email could not be sent"));
+      await notifyShipped(o, trackingUrl ?? null, req.log);
     }
     return { ok: true };
   });

@@ -383,6 +383,7 @@ enum ShopOrderStatus {
   PENDING_PAYMENT
   PAID
   SHIPPED
+  DELIVERED
   CANCELED
 }
 
@@ -407,7 +408,7 @@ model ShopOrder {
   createdAt       DateTime        @default(now())
   paidAt          DateTime?
   shippedAt       DateTime?
-
+  deliveredAt     DateTime?
   business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
   items    ShopOrderItem[]
 

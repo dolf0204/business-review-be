@@ -2,11 +2,11 @@ import type { FastifyInstance } from "fastify";
 import QRCode from "qrcode";
 import type { ZodTypeProvider } from "fastify-type-provider-zod";
 import { z } from "zod";
-import { config } from "../../config.js";
 import { prisma } from "../../db.js";
 import { ownedBusiness } from "../../lib/auth/access.js";
 import { businessView, MAX_BUSINESSES_PER_OWNER, publishProblem } from "../../lib/business/businessView.js";
-import { newCode, shareUrl } from "../../lib/business/code.js";
+import { newCode } from "../../lib/business/code.js";
+import { shareAddress } from "../../lib/business/shareAddress.js";
 import { findPlaces, placeDetails, PlacesError } from "../../lib/places/googlePlaces.js";
 import { mediaFilename } from "../../lib/media/media.js";
 import { recheckBusiness, REVIEWED_FIELDS, reviewBusiness } from "../../lib/review/review.js";
@@ -96,11 +96,11 @@ export async function businessRoutes(app: FastifyInstance) {
     return businessView(await prisma.business.update({ where: { id: b.id }, data: { publishedAt: null } }));
   });
 
-  // The address in the QR code and on the NFC tag. It never changes, so a printed code survives every later edit.
+  // The address in the QR code and on the NFC tag: the business's own address, fixed at the first publish. Until then there is none.
   r.get("/businesses/:id/share", { ...auth, schema: { params: idParam } }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
-    return { qrUrl: shareUrl(config.APP_URL, b.code, "qr"), nfcUrl: shareUrl(config.APP_URL, b.code, "nfc") };
+    return { qrUrl: shareAddress(b, "qr"), nfcUrl: shareAddress(b, "nfc") };
   });
 
   r.get("/businesses/:id/qr", {
@@ -109,7 +109,8 @@ export async function businessRoutes(app: FastifyInstance) {
   }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
-    const url = shareUrl(config.APP_URL, b.code, "qr");
+    const url = shareAddress(b, "qr");
+    if (!url) return reply.code(409).send({ error: "not_published" });
     const opts = { errorCorrectionLevel: "M" as const, margin: 2, width: req.query.size };
     if (req.query.format === "png") return reply.type("image/png").send(await QRCode.toBuffer(url, opts));
     return reply.type("image/svg+xml").send(await QRCode.toString(url, { ...opts, type: "svg" }));

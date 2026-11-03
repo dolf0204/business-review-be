@@ -6,6 +6,7 @@ import { config } from "../../config.js";
 import { prisma } from "../../db.js";
 import type { TokenKind } from "../../generated/prisma/enums.js";
 import { sendMail } from "../../lib/mail/mail.js";
+import { isOperatorEmail } from "../../lib/auth/operator.js";
 import { hashToken, newToken } from "../../lib/auth/tokens.js";
 import { stripeGuard } from "../../billing/stripeGuard.js";
 import { cancelBilling, removeFiles } from "../../lib/auth/teardown.js";
@@ -135,6 +136,6 @@ export async function authRoutes(app: FastifyInstance) {
       reply.clearCookie(SESSION_COOKIE, { path: "/" });
       return reply.code(401).send({ error: UNAUTHENTICATED });
     }
-    return user;
+    return { ...user, isOperator: isOperatorEmail(user.email) };
   });
 }
