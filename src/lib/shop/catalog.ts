@@ -1,3 +1,5 @@
+import { HOME_COUNTRY, SHIPPING_ABROAD_CENTS, SHIPPING_HOME_CENTS, SHIP_COUNTRIES } from "./shipping.js";
+
 export const SHOP_CURRENCY = "eur";
 
 export const SIZES = ["S", "M", "L"] as const;
@@ -71,7 +73,6 @@ export const shopImageUrl = (appUrl: string, design: string, finish: string) =>
   `${appUrl.replace(/\/+$/, "")}${SHOP_IMAGE_DIR}/${design}_${Math.max(0, FINISHES.findIndex((f) => f === finish))}.jpg`;
 
 export const YEARLY_DISCOUNT_PERCENT = 25;
-export const SHIPPING_CENTS = 0;
 export const PRINT_TEXT_MAX = 32;
 export const MAX_ITEMS_PER_ORDER = 10;
 
@@ -81,9 +82,7 @@ export const publicCatalog = () => ({
   finishes: FINISHES,
   chapters: CHAPTERS.map((id) => ({ id, designs: DESIGNS.filter((d) => d.chapter === id).map((d) => d.id) })),
   yearlyDiscountPercent: YEARLY_DISCOUNT_PERCENT,
-  shippingCents: SHIPPING_CENTS,
+  shipping: { homeCountry: HOME_COUNTRY, homeCents: SHIPPING_HOME_CENTS, abroadCents: SHIPPING_ABROAD_CENTS, countries: SHIP_COUNTRIES },
   printTextMax: PRINT_TEXT_MAX,
   maxItemsPerOrder: MAX_ITEMS_PER_ORDER,
 });
-
-export const shipCountries = (raw: string) => [...new Set(raw.split(",").map((c) => c.trim().toUpperCase()).filter((c) => /^[A-Z]{2}$/.test(c)))];

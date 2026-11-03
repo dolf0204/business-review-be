@@ -8,7 +8,8 @@ import { ownedBusiness } from "../../lib/auth/access.js";
 import { freePeriodEnd, isShopKey, priceOrder, type PricedOrder } from "../../lib/shop/order.js";
 import { notifyShipped } from "../../lib/shop/notifyShipped.js";
 import { cancelShopOrder, fulfilShopOrder, SHOP_ORDER_METADATA } from "../../lib/shop/fulfil.js";
-import { DESIGN_IDS, FINISHES, MAX_ITEMS_PER_ORDER, PRINT_TEXT_MAX, publicCatalog, shipCountries, SHOP_CURRENCY, SIZES, YEARLY_DISCOUNT_PERCENT } from "../../lib/shop/catalog.js";
+import { DESIGN_IDS, FINISHES, MAX_ITEMS_PER_ORDER, PRINT_TEXT_MAX, publicCatalog, SHOP_CURRENCY, SIZES, YEARLY_DISCOUNT_PERCENT } from "../../lib/shop/catalog.js";
+import { HOME_COUNTRY, isShipCountry, SHIP_COUNTRIES } from "../../lib/shop/shipping.js";
 import { stripeGuard } from "../../billing/stripeGuard.js";
 import { idParam } from "../../schemas.js";
 
@@ -25,6 +26,7 @@ const optional = (max: number) => z.string().trim().max(max).transform((v) => (v
 
 const itemsBody = z.array(z.object({ design: z.enum(DESIGN_IDS), finish: z.enum(FINISHES), size: z.enum(SIZES), printText: text(PRINT_TEXT_MAX) })).min(1).max(MAX_ITEMS_PER_ORDER);
 const addressBody = z.object({ name: text(100), line1: text(120), line2: optional(120), postalCode: text(20), city: text(80), country: z.string().trim().toUpperCase().length(2), phone: optional(40) });
+const quoteCountry = z.string().trim().toUpperCase().pipe(z.enum(SHIP_COUNTRIES)).default(HOME_COUNTRY);
 const orderParams = z.object({ id: z.uuid(), orderId: z.uuid() });
 const operatorQuery = z.object({ id: z.uuid(), key: z.string().min(10).max(100) });
 
@@ -74,7 +76,7 @@ export async function shopRoutes(app: FastifyInstance) {
     return {
       available: !!config.KIT_ORDER_EMAIL,
       payOnline: billingConfigured(),
-      countries: shipCountries(config.KIT_SHIP_COUNTRIES),
+      countries: [...SHIP_COUNTRIES],
       yearly: plan.yearly,
       freeAvailable: plan.freeAvailable,
       discountPercent: plan.yearly ? YEARLY_DISCOUNT_PERCENT : 0,
@@ -82,11 +84,11 @@ export async function shopRoutes(app: FastifyInstance) {
     };
   });
 
-  r.post("/businesses/:id/shop/quote", { ...auth, ...quick, schema: { params: idParam, body: z.object({ items: itemsBody }) } }, async (req, reply) => {
+  r.post("/businesses/:id/shop/quote", { ...auth, ...quick, schema: { params: idParam, body: z.object({ items: itemsBody, country: quoteCountry }) } }, async (req, reply) => {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
     const plan = await planFor(b.id);
-    return quoteView(priceOrder(req.body.items, plan));
+    return quoteView(priceOrder(req.body.items, { ...plan, country: req.body.country }));
   });
 
   r.post("/businesses/:id/shop/orders", { ...auth, ...create, schema: { params: idParam, body: z.object({ items: itemsBody, address: addressBody }) } }, async (req, reply) => {
@@ -94,12 +96,13 @@ export async function shopRoutes(app: FastifyInstance) {
     const b = await ownedBusiness(req.user.sub, req.params.id);
     if (!b) return reply.code(404).send({ error: "not_found" });
     const { items, address } = req.body;
-    if (!shipCountries(config.KIT_SHIP_COUNTRIES).includes(address.country)) return reply.code(422).send({ error: "country_not_supported" });
+    const country = address.country;
+    if (!isShipCountry(country)) return reply.code(422).send({ error: "country_not_supported" });
+    if (!billingConfigured()) return reply.code(503).send({ error: "billing_unavailable" });
 
     await releasePending(b.id, req.log);
     const plan = await planFor(b.id);
-    const priced = priceOrder(items, plan);
-    if (priced.totalCents > 0 && !billingConfigured()) return reply.code(503).send({ error: "billing_unavailable" });
+    const priced = priceOrder(items, { ...plan, country });
 
     let order;
     try {
@@ -116,7 +119,7 @@ export async function shopRoutes(app: FastifyInstance) {
           line2: address.line2 ?? null,
           postalCode: address.postalCode,
           city: address.city,
-          country: address.country,
+          country,
           phone: address.phone ?? null,
           items: { create: priced.items.map((i) => ({ design: i.design, finish: i.finish, size: i.size, printText: i.printText, listCents: i.listCents, unitCents: i.unitCents })) },
         },
@@ -124,11 +127,6 @@ export async function shopRoutes(app: FastifyInstance) {
     } catch (err) {
       if ((err as { code?: string }).code === UNIQUE_VIOLATION) return reply.code(409).send({ error: "free_stand_already_used" });
       throw err;
-    }
-
-    if (priced.totalCents === 0) {
-      await fulfilShopOrder(order.id, req.log);
-      return reply.code(201).send({ id: order.id, url: null });
     }
 
     return stripeGuard(req, reply, async () => {
@@ -140,7 +138,7 @@ export async function shopRoutes(app: FastifyInstance) {
           price_data: { currency: SHOP_CURRENCY, unit_amount: i.unitCents, product_data: { name: `Handmade stand ${i.design} (${i.size}, ${i.finish})`, description: `Engraved: ${i.printText}` } },
         }));
       if (priced.shippingCents > 0) {
-        lineItems.push({ quantity: 1, price_data: { currency: SHOP_CURRENCY, unit_amount: priced.shippingCents, product_data: { name: "Shipping", description: address.country } } });
+        lineItems.push({ quantity: 1, price_data: { currency: SHOP_CURRENCY, unit_amount: priced.shippingCents, product_data: { name: "Shipping", description: country } } });
       }
       const session = await stripe().checkout.sessions.create({
         mode: "payment",

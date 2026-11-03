@@ -1,6 +1,7 @@
 import { createHmac, timingSafeEqual } from "node:crypto";
 import { esc } from "../mail/layout.js";
-import { SHIPPING_CENTS, SIZE_PRICE_CENTS, YEARLY_DISCOUNT_PERCENT, type ShopDesignId, type ShopFinish, type ShopSize } from "./catalog.js";
+import { SIZE_PRICE_CENTS, YEARLY_DISCOUNT_PERCENT, type ShopDesignId, type ShopFinish, type ShopSize } from "./catalog.js";
+import { shippingCentsFor, type ShipCountry } from "./shipping.js";
 
 const ORDER_REF_LENGTH = 8;
 
@@ -32,6 +33,7 @@ export interface PricedOrder {
 export interface PricingContext {
   yearly: boolean;
   freeAvailable: boolean;
+  country: ShipCountry;
 }
 
 export function priceOrder(inputs: readonly ShopItemInput[], ctx: PricingContext): PricedOrder {
@@ -44,7 +46,8 @@ export function priceOrder(inputs: readonly ShopItemInput[], ctx: PricingContext
     return { ...input, listCents, unitCents, free };
   });
   const subtotalCents = items.reduce((sum, i) => sum + i.unitCents, 0);
-  return { items, subtotalCents, shippingCents: SHIPPING_CENTS, totalCents: subtotalCents + SHIPPING_CENTS, freeApplied: freeIndex >= 0 };
+  const shippingCents = shippingCentsFor(ctx.country);
+  return { items, subtotalCents, shippingCents, totalCents: subtotalCents + shippingCents, freeApplied: freeIndex >= 0 };
 }
 
 export interface SubscriptionState {

@@ -28,6 +28,7 @@ vi.mock("stripe", () => {
 import { buildApp } from "../../../src/app.js";
 import { config } from "../../../src/config.js";
 import { shopKey } from "../../../src/lib/shop/order.js";
+import { SHIPPING_ABROAD_CENTS, SHIPPING_HOME_CENTS } from "../../../src/lib/shop/shipping.js";
 
 const ID = "11111111-1111-4111-8111-111111111111";
 const OID = "44444444-4444-4444-8444-444444444444";
@@ -36,6 +37,7 @@ const YEAR_END = new Date(Date.now() + 200 * 86_400_000);
 const YEARLY = { interval: "YEAR", status: "ACTIVE", currentPeriodEnd: YEAR_END };
 const address = { name: "Ana Horvat", line1: "Obala 1", postalCode: "23000", city: "Zadar", country: "hr" };
 const stand = (size: "S" | "M" | "L", printText = "Salon Lana") => ({ design: "halo", finish: "amber", size, printText });
+const PAID_TOTAL_CENTS = 2500 + SHIPPING_HOME_CENTS;
 
 async function owner(method: "GET" | "POST", url: string, payload?: object) {
   const app = await buildApp();
@@ -45,7 +47,7 @@ async function owner(method: "GET" | "POST", url: string, payload?: object) {
 }
 
 const orderRow = (over = {}) => ({
-  id: OID, status: "PENDING_PAYMENT", subtotalCents: 2500, shippingCents: 0, totalCents: 2500, createdAt: new Date("2026-11-02T12:00:00Z"), name: "Ana", line1: "Obala 1", line2: null, postalCode: "23000", city: "Zadar", country: "HR", phone: null,
+  id: OID, status: "PENDING_PAYMENT", subtotalCents: 2500, shippingCents: SHIPPING_HOME_CENTS, totalCents: PAID_TOTAL_CENTS, createdAt: new Date("2026-11-02T12:00:00Z"), name: "Ana", line1: "Obala 1", line2: null, postalCode: "23000", city: "Zadar", country: "HR", phone: null,
   items: [{ design: "halo", finish: "amber", size: "M", printText: "Salon Lana", listCents: 2500, unitCents: 2500 }], business: { ...BIZ, owner: { email: "owner@example.com" } }, ...over,
 });
 
@@ -64,30 +66,43 @@ beforeEach(() => {
 });
 
 describe("the catalog and quotes", () => {
-  it("shows the catalog to anyone", async () => {
+  it("shows the catalog and the shipping rates to anyone", async () => {
     const app = await buildApp();
     const res = await app.inject({ url: "/public/shop" });
     await app.close();
     expect(res.json().sizes).toEqual([{ size: "S", priceCents: 2000 }, { size: "M", priceCents: 2500 }, { size: "L", priceCents: 3000 }]);
+    expect(res.json().shipping).toMatchObject({ homeCountry: "HR", homeCents: SHIPPING_HOME_CENTS, abroadCents: SHIPPING_ABROAD_CENTS });
   });
-  it("quotes full prices without a plan and the discount and the free stand with a yearly plan", async () => {
-    expect((await owner("POST", `/businesses/${ID}/shop/quote`, { items: [stand("S"), stand("L")] })).json().totalCents).toBe(5000);
+  it("quotes full prices with home shipping when no country is given, and the abroad rate for another country", async () => {
+    const home = (await owner("POST", `/businesses/${ID}/shop/quote`, { items: [stand("S"), stand("L")] })).json();
+    expect(home.shippingCents).toBe(SHIPPING_HOME_CENTS);
+    expect(home.totalCents).toBe(5000 + SHIPPING_HOME_CENTS);
+    const abroad = (await owner("POST", `/businesses/${ID}/shop/quote`, { items: [stand("S"), stand("L")], country: "de" })).json();
+    expect(abroad.shippingCents).toBe(SHIPPING_ABROAD_CENTS);
+    expect(abroad.totalCents).toBe(5000 + SHIPPING_ABROAD_CENTS);
+  });
+  it("refuses a quote for a country we do not post to", async () => {
+    expect((await owner("POST", `/businesses/${ID}/shop/quote`, { items: [stand("S")], country: "US" })).statusCode).toBe(400);
+  });
+  it("quotes the discount and the free stand with a yearly plan, and still charges the shipping", async () => {
     db.businessSubscription.findUnique.mockResolvedValue(YEARLY);
     const q = (await owner("POST", `/businesses/${ID}/shop/quote`, { items: [stand("S"), stand("L")] })).json();
     expect(q.items.map((i: { unitCents: number }) => i.unitCents)).toEqual([1500, 0]);
     expect(q.freeApplied).toBe(true);
+    expect(q.totalCents).toBe(1500 + SHIPPING_HOME_CENTS);
   });
   it("does not offer the free stand again once the period's free stand is taken", async () => {
     db.businessSubscription.findUnique.mockResolvedValue(YEARLY);
     db.shopOrder.findFirst.mockResolvedValue({ id: "old" });
     const q = (await owner("POST", `/businesses/${ID}/shop/quote`, { items: [stand("L")] })).json();
-    expect(q.totalCents).toBe(2250);
+    expect(q.totalCents).toBe(2250 + SHIPPING_HOME_CENTS);
     expect(q.freeApplied).toBe(false);
   });
   it("tells the owner what the shop offers, and keeps other owners out", async () => {
     db.businessSubscription.findUnique.mockResolvedValue(YEARLY);
     const res = await owner("GET", `/businesses/${ID}/shop`);
     expect(res.json()).toMatchObject({ available: true, payOnline: true, yearly: true, freeAvailable: true, discountPercent: 25 });
+    expect(res.json().countries).toEqual(expect.arrayContaining(["HR", "DE"]));
     db.business.findFirst.mockResolvedValue(null);
     expect((await owner("GET", `/businesses/${ID}/shop`)).statusCode).toBe(404);
     expect((await owner("POST", `/businesses/${ID}/shop/quote`, { items: [stand("S")] })).statusCode).toBe(404);
@@ -95,40 +110,35 @@ describe("the catalog and quotes", () => {
 });
 
 describe("placing an order", () => {
-  it("sends a paying owner to Stripe with the exact amounts from our catalog, and no line for a free stand", async () => {
+  it("sends a paying owner to Stripe with the exact amounts from our catalog, the shipping as its own line, and no line for a free stand", async () => {
     db.businessSubscription.findUnique.mockResolvedValue(YEARLY);
     const res = await owner("POST", `/businesses/${ID}/shop/orders`, { items: [stand("M"), stand("L")], address });
     expect(res.statusCode).toBe(201);
     expect(res.json()).toEqual({ id: OID, url: "https://checkout.example.com/pay" });
     const data = db.shopOrder.create.mock.calls[0]![0].data;
-    expect(data).toMatchObject({ businessId: ID, totalCents: 1875, country: "HR", freePeriodEnd: YEAR_END });
+    expect(data).toMatchObject({ businessId: ID, subtotalCents: 1875, shippingCents: SHIPPING_HOME_CENTS, totalCents: 1875 + SHIPPING_HOME_CENTS, country: "HR", freePeriodEnd: YEAR_END });
     const session = stripeApi.checkout.sessions.create.mock.calls[0]![0];
     expect(session.mode).toBe("payment");
     expect(session.metadata).toEqual({ shopOrderId: OID });
     expect(session.success_url).toBe(`http://localhost:5190/shop?business=${ID}&shop_session={CHECKOUT_SESSION_ID}&order=${OID}`);
     expect(session.cancel_url).toBe(`http://localhost:5190/shop?business=${ID}&shop_canceled=1`);
-    expect(session.line_items.map((l: { price_data: { unit_amount: number } }) => l.price_data.unit_amount)).toEqual([1875]);
+    expect(session.line_items.map((l: { price_data: { unit_amount: number } }) => l.price_data.unit_amount)).toEqual([1875, SHIPPING_HOME_CENTS]);
     expect(db.shopOrder.update.mock.calls[0]![0].data).toEqual({ stripeSessionId: "cs_test_12345" });
     expect(mail.sendMail).not.toHaveBeenCalled();
   });
-  it("finishes a fully free order at once and mails the maker the QR code and the owner a thank you", async () => {
+  it("sends an owner whose only stand is free to Stripe for the shipping alone, using the abroad rate abroad", async () => {
     db.businessSubscription.findUnique.mockResolvedValue(YEARLY);
-    db.shopOrder.findUnique.mockResolvedValue(orderRow({ totalCents: 0, items: [{ design: "halo", finish: "amber", size: "L", printText: "Salon Lana", unitCents: 0 }] }));
-    const res = await owner("POST", `/businesses/${ID}/shop/orders`, { items: [stand("L")], address });
-    expect(res.json()).toEqual({ id: OID, url: null });
-    expect(stripeApi.checkout.sessions.create).not.toHaveBeenCalled();
-    const toMaker = mail.sendMail.mock.calls[0]![0];
-    expect(toMaker.to).toBe("kits@example.com");
-    expect(toMaker.attachments.map((a: { name: string }) => a.name)).toEqual(["qr-abcd2345.png"]);
-    expect(toMaker.html).toContain("FREE, yearly plan");
-    expect(toMaker.html).toContain("http://localhost:5190/b/abcd2345?s=n");
-    expect(toMaker.html).not.toContain("<Lana>");
-    expect(mail.sendMail.mock.calls[1]![0].to).toBe("owner@example.com");
+    const res = await owner("POST", `/businesses/${ID}/shop/orders`, { items: [stand("L")], address: { ...address, country: "de" } });
+    expect(res.json()).toEqual({ id: OID, url: "https://checkout.example.com/pay" });
+    expect(db.shopOrder.create.mock.calls[0]![0].data).toMatchObject({ subtotalCents: 0, shippingCents: SHIPPING_ABROAD_CENTS, totalCents: SHIPPING_ABROAD_CENTS, country: "DE", freePeriodEnd: YEAR_END });
+    const session = stripeApi.checkout.sessions.create.mock.calls[0]![0];
+    expect(session.line_items.map((l: { price_data: { unit_amount: number } }) => l.price_data.unit_amount)).toEqual([SHIPPING_ABROAD_CENTS]);
+    expect(mail.sendMail).not.toHaveBeenCalled();
   });
-  it("sells to an owner without a plan at full price", async () => {
+  it("sells to an owner without a plan at full price plus shipping", async () => {
     const res = await owner("POST", `/businesses/${ID}/shop/orders`, { items: [stand("S")], address });
     expect(res.statusCode).toBe(201);
-    expect(db.shopOrder.create.mock.calls[0]![0].data).toMatchObject({ totalCents: 2000, freePeriodEnd: null });
+    expect(db.shopOrder.create.mock.calls[0]![0].data).toMatchObject({ totalCents: 2000 + SHIPPING_HOME_CENTS, freePeriodEnd: null });
   });
   it("answers 409 when two clicks race for the one free stand", async () => {
     db.businessSubscription.findUnique.mockResolvedValue(YEARLY);
@@ -156,15 +166,28 @@ describe("paying", () => {
     db.shopOrder.findUnique.mockResolvedValue(orderRow());
   });
   it("marks the order paid when Stripe says the session is paid and the amount matches", async () => {
-    stripeApi.checkout.sessions.retrieve.mockResolvedValue({ payment_status: "paid", amount_total: 2500 });
+    stripeApi.checkout.sessions.retrieve.mockResolvedValue({ payment_status: "paid", amount_total: PAID_TOTAL_CENTS });
     const res = await owner("POST", `/businesses/${ID}/shop/orders/${OID}/confirm`, { sessionId: "cs_test_12345" });
     expect(res.json()).toEqual({ ok: true });
     expect(db.shopOrder.updateMany.mock.calls[0]![0].data).toMatchObject({ status: "PAID" });
     expect(mail.sendMail).toHaveBeenCalledTimes(2);
-    expect(mail.sendMail.mock.calls[0]![0].html).toContain("Paid online: 25.00 EUR");
+    expect(mail.sendMail.mock.calls[0]![0].html).toContain("Paid online: 30.00 EUR");
+  });
+  it("mails the maker the QR code and the owner a thank you for a free stand that paid only the shipping", async () => {
+    db.shopOrder.findUnique.mockResolvedValue(orderRow({ subtotalCents: 0, totalCents: SHIPPING_HOME_CENTS, items: [{ design: "halo", finish: "amber", size: "L", printText: "Salon Lana", unitCents: 0 }] }));
+    stripeApi.checkout.sessions.retrieve.mockResolvedValue({ payment_status: "paid", amount_total: SHIPPING_HOME_CENTS });
+    expect((await owner("POST", `/businesses/${ID}/shop/orders/${OID}/confirm`, { sessionId: "cs_test_12345" })).json()).toEqual({ ok: true });
+    const toMaker = mail.sendMail.mock.calls[0]![0];
+    expect(toMaker.to).toBe("kits@example.com");
+    expect(toMaker.attachments.map((a: { name: string }) => a.name)).toEqual(["qr-abcd2345.png"]);
+    expect(toMaker.html).toContain("FREE, yearly plan");
+    expect(toMaker.html).toContain("Paid online: 5.00 EUR");
+    expect(toMaker.html).toContain("http://localhost:5190/b/abcd2345?s=n");
+    expect(toMaker.html).not.toContain("<Lana>");
+    expect(mail.sendMail.mock.calls[1]![0].to).toBe("owner@example.com");
   });
   it("does nothing while unpaid, and refuses a session that is not this order's", async () => {
-    stripeApi.checkout.sessions.retrieve.mockResolvedValue({ payment_status: "unpaid", amount_total: 2500 });
+    stripeApi.checkout.sessions.retrieve.mockResolvedValue({ payment_status: "unpaid", amount_total: PAID_TOTAL_CENTS });
     expect((await owner("POST", `/businesses/${ID}/shop/orders/${OID}/confirm`, { sessionId: "cs_test_12345" })).statusCode).toBe(202);
     expect((await owner("POST", `/businesses/${ID}/shop/orders/${OID}/confirm`, { sessionId: "cs_other_99999" })).statusCode).toBe(403);
     expect(db.shopOrder.updateMany).not.toHaveBeenCalled();
@@ -187,11 +210,11 @@ describe("the Stripe webhook for shop orders", () => {
   };
   it("fulfils a paid one-off payment of a shop order, once", async () => {
     db.shopOrder.findUnique.mockResolvedValue(orderRow());
-    await send({ type: "checkout.session.completed", data: { object: { mode: "payment", payment_status: "paid", amount_total: 2500, metadata: { shopOrderId: OID } } } });
+    await send({ type: "checkout.session.completed", data: { object: { mode: "payment", payment_status: "paid", amount_total: PAID_TOTAL_CENTS, metadata: { shopOrderId: OID } } } });
     expect(mail.sendMail).toHaveBeenCalledTimes(2);
     vi.clearAllMocks();
     db.shopOrder.findUnique.mockResolvedValue(orderRow({ status: "PAID" }));
-    await send({ type: "checkout.session.completed", data: { object: { mode: "payment", payment_status: "paid", amount_total: 2500, metadata: { shopOrderId: OID } } } });
+    await send({ type: "checkout.session.completed", data: { object: { mode: "payment", payment_status: "paid", amount_total: PAID_TOTAL_CENTS, metadata: { shopOrderId: OID } } } });
     expect(mail.sendMail).not.toHaveBeenCalled();
   });
   it("cancels the order, and frees its free stand, when the session expires", async () => {
