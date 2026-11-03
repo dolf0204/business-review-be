@@ -3,7 +3,7 @@ import { isRelativeMedia, toStoredImageUrl } from "./lib/media/media.js";
 
 export const KINDS = ["restaurant", "cafe", "bar", "cocktail", "beauty", "barber", "hairdresser", "shop", "florist", "grocery", "sport", "sight", "beach", "other"] as const;
 export type Kind = (typeof KINDS)[number];
-export const TEMPLATES = ["classic", "warm", "modern", "elegant", "bold", "fresh"] as const;
+export const TEMPLATES = ["classic", "warm", "modern", "elegant", "bold", "fresh", "midnight", "traditional"] as const;
 export const UI_LANGS = ["en", "hr", "de", "it", "fr", "es", "sl", "pl", "cs", "hu"] as const;
 
 export const idParam = z.object({ id: z.uuid() });
