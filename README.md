@@ -11,7 +11,7 @@ Repositories (keep them side by side):
 | Repository | What it is | Local port |
 | --- | --- | --- |
 | `business-review-be` (this one) | API, database | 8090 |
-| `business-review-fe` | One front end: business admin (`/`) and guest pages (`/b/<code>`) | 5190 |
+| `business-review-fe` | One front end: business admin (`/`) and guest pages (`/b/<code>`, and `/` on a business's own address) | 5190 |
 | `tourists-faq-backend` | The TouristAsk API, which reads `GET /partners` | 8080 |
 
 The ports differ from TouristAsk's (8080, 5173, 5177), so everything can run on one computer at once.
@@ -86,7 +86,8 @@ All variables are validated in [`src/config.ts`](src/config.ts); a wrong value s
 
 | Variable | Meaning |
 | --- | --- |
-| `PORT` (8090), `PUBLIC_API_URL`, `APP_URL` | Where the API runs, and the front end (allowed CORS origin, base of every QR code: `APP_URL/b/<code>`). |
+| `PORT` (8090), `PUBLIC_API_URL`, `APP_URL` | Where the API runs, and the front end (allowed CORS origin; its scheme is also used for the business addresses). The permanent address of a business is `APP_URL/b/<code>`. |
+| `SLUG_BASE_DOMAIN` | Domain of the business's own addresses, `<name>.<SLUG_BASE_DOMAIN>`: `businessask.eu` in production, `localhost:5190` on your computer (the port is part of the value here; the front end's `VITE_SLUG_BASE_DOMAIN` is just `localhost`). Empty switches readable addresses off, and then no business has a QR or NFC address. See "Readable addresses". |
 | `DATABASE_URL` | PostgreSQL. |
 | `JWT_SECRET`, `COOKIE_SECURE` | Session cookie `session` (secret at least 32 characters). |
 | `PARTNER_API_KEYS` | Comma separated keys for `GET /partners`. Empty = the feed is closed. |
@@ -103,11 +104,11 @@ All variables are validated in [`src/config.ts`](src/config.ts); a wrong value s
 ```
 prisma/schema.prisma      data model (User, Business so far); migrations/ is committed
 src/server.ts             starts the API
-src/app.ts                Fastify app: Helmet, CORS (APP_URL only), rate limit, cookie JWT, Zod validation
+src/app.ts                Fastify app: Helmet, CORS (APP_URL and the business addresses), rate limit, cookie JWT, Zod validation
 src/config.ts             every environment variable
 src/db.ts                 the one Prisma client
-src/routes/               HTTP endpoints: health, partners
-src/lib/                  geo (distance, bounding box), code (short codes for QR/NFC)
+src/routes/               HTTP endpoints: health, partners, business slug
+src/lib/                  geo (distance, bounding box), code (short codes for QR/NFC), slug (readable addresses)
 test/                     Vitest
 docs/                     roadmap, partner API, accounts
 ```
@@ -128,9 +129,10 @@ Session is the HTTP-only cookie `session`. Unknown or foreign ids answer `404 no
 | Health | `GET /health` |
 | Auth | `POST /auth/register`, `/auth/verify-email`, `/auth/resend-verification`, `/auth/login`, `/auth/logout`, `/auth/forgot-password`, `/auth/reset-password`; `GET /auth/me` |
 | Businesses | `GET/POST /businesses`, `GET/PATCH/DELETE /businesses/:id`, `POST /businesses/:id/publish`, `/unpublish` (max 5 per owner) |
+| Readable address | `GET /businesses/:id/slug` (current name, locked or not, up to 3 free suggestions), `GET /businesses/:id/slug/check?slug=` (status `ok`, `invalid`, `reserved` or `taken`; 60 per minute), `PUT /businesses/:id/slug` (claim a name). See "Readable addresses". |
 | Google | `POST /google/lookup` (pasted Google Maps link or typed name and town, up to 3 candidates), `PUT /businesses/:id/google` (confirm the place; position, address, rating, review link are read from Google, never from the browser) |
-| Share (slice 2) | `GET /businesses/:id/share` (the QR and NFC addresses, `/b/<code>?s=q` and `?s=n`), `GET /businesses/:id/qr?format=svg\|png&size=200..2000` |
-| Guest page | `GET /public/b/:code` (published businesses only, no owner or account data, cached 60 s) |
+| Share (slice 2) | `GET /businesses/:id/share` (the QR and NFC addresses, `<own address>/?s=q` and `?s=n`; both null until the address is locked at the first publish), `GET /businesses/:id/qr?format=svg\|png&size=200..2000` (answers `409 not_published` until then) |
+| Guest page | `GET /public/b/:code` and `GET /public/s/:slug` (published businesses only, no owner or account data, cached 60 s; by readable name only when the name is locked) |
 | Guests (slice 3) | `POST /public/b/:code/join` (email link, Turnstile, 5 links per hour per address), `POST /guest/verify`, `GET/PATCH /guest/me`, `POST /guest/logout`, `POST /guest/b/:code/join` (signed-in guest joins another business), `PUT /guest/b/:code/marketing` (give or withdraw consent for offers by email) |
 | News (slice 3) | `GET/POST /businesses/:id/posts`, `DELETE /posts/:id` (max 20 per business); the latest 5 live posts are part of `GET /public/b/:code` |
 | Reviews (slice 4) | `POST /guest/b/:code/visit` (counts a visit once per day, answers what to ask: `google`, `tripadvisor` or nothing), `POST /guest/b/:code/review/:platform/decline`, `GET /r/:code/:platform` (counts the click, then redirects to the stored Google or Tripadvisor link), `GET /businesses/:id/stats` |
@@ -221,3 +223,20 @@ A coupon is a discount a business offers, for example "10% off lunch": a title (
 sees the open coupons on the business page; a member taps "Use" and **staff confirm by entering the staff code of the day on the guest's phone** (the same six digits as for the loyalty card,
 shown to the owner next to the coupons). Each guest can use a coupon once: the database enforces it (unique coupon and membership), so a double tap cannot use it twice. Outside its dates, or
 when switched off, a coupon is not shown and cannot be used. The owner sees how often each coupon was used.
+
+## Readable addresses
+
+A business gets its own address, `<name>.<SLUG_BASE_DOMAIN>` (for example `tockica.businessask.eu`), and that address is what the QR code and the NFC tag carry. The code lives in
+`src/lib/slug/` and `src/routes/business/slug.ts`.
+
+- **Name rules:** 3 to 40 characters, lower-case letters, digits and single hyphens. What the owner types is normalised first (accents dropped, `đ` becomes `d`). System words and brand names are
+  reserved, and a name belongs to one business only (a unique index in the database).
+- **Choosing:** the editor reads the current name and up to 3 free suggestions, built from the business name, kind and address in the owner's language. A typed name is checked live
+  (`slug/check`, 60 per minute) and claimed with `PUT`. Refusals: `422 slug_invalid`, `422 slug_reserved`, `409 slug_taken` (with fresh suggestions), `409 slug_locked`.
+- **Locking:** the name is fixed at the first publish and never changes again, not even after unpublishing, so a printed QR code keeps working. If the owner never chose a name, publishing takes the
+  first free suggestion (`422 slug_unavailable` if none can be claimed). Choosing a name for a business that is already published locks it at once. Until the name is locked the business view
+  shows `slug` and `siteUrl` as null, `GET /businesses/:id/share` has no addresses and the QR route answers `409 not_published`.
+- **Guests:** `GET /public/s/:slug` serves the page only for a locked and live business, otherwise `404 not_found`. The permanent `/b/<code>` stays valid forever; the front end sends the guest on to
+  the business's own address (the `siteUrl` field of `GET /public/b/:code`). The shop order mail to the maker still carries `/b/<code>` addresses, which redirect.
+- **Setup:** with `SLUG_BASE_DOMAIN` empty the feature is off. Locally it is `localhost:5190`, and `*.localhost` opens on the same computer without any DNS. In production it needs wildcard DNS
+  (`*.businessask.eu`) and a wildcard certificate; hosting is not chosen yet. CORS allows `APP_URL` and `<scheme of APP_URL>//<name>.<SLUG_BASE_DOMAIN>`, so a business's own address can call the API.
