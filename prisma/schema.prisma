@@ -90,14 +90,14 @@ model Business {
   createdAt            DateTime  @default(now())
   updatedAt            DateTime  @updatedAt
 
-  posts          Post[]
-  loyaltyProgram LoyaltyProgram?
-  campaigns      Campaign[]
-  subscription   BusinessSubscription?
-  shopOrders     ShopOrder[]
-  coupons        Coupon[]
-  memberships    Membership[]
-  guestTokens    GuestToken[]
+  posts           Post[]
+  loyaltyPrograms LoyaltyProgram[]
+  campaigns       Campaign[]
+  subscription    BusinessSubscription?
+  shopOrders      ShopOrder[]
+  coupons         Coupon[]
+  memberships     Membership[]
+  guestTokens     GuestToken[]
 
   @@index([ownerId])
   @@index([lat, lng])
@@ -205,28 +205,40 @@ enum LoyaltyMethod {
   STAFF_CODE // the guest typed the code staff showed them
 }
 
-// The business's loyalty offer: collect `goal` visits, get the reward. One program per business.
+enum LoyaltyCarryOver {
+  RESET // when this period ends, stars on unfinished cards are lost and the next period starts every card at zero
+  TRANSFER // when this period ends, unfinished cards move to the next period with their stars
+}
+
+// One loyalty action of a business: collect `goal` visits inside the period, get the reward. A business has a sequence of them that never overlap.
 model LoyaltyProgram {
-  id            String    @id @default(uuid()) @db.Uuid
-  businessId    String    @unique @db.Uuid
-  enabled       Boolean   @default(false)
-  goal          Int       @default(10)
+  id            String           @id @default(uuid()) @db.Uuid
+  businessId    String           @db.Uuid
+  enabled       Boolean          @default(false)
+  goal          Int              @default(10)
   rewardText    String
   // Punches only count inside this window. Null means no limit on that side.
   startsAt      DateTime?
   endsAt        DateTime?
   cardValidDays Int?
   // How close the guest's phone must be to the business.
-  radiusMeters  Int       @default(150)
-  updatedAt     DateTime  @updatedAt
+  radiusMeters  Int              @default(150)
+  // What happens to unfinished cards when this period ends. The owner can change it until the cards are moved.
+  carryOver     LoyaltyCarryOver @default(RESET)
+  updatedAt     DateTime         @updatedAt
 
-  business Business @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  cards    LoyaltyCard[]
+
+  @@index([businessId, startsAt])
 }
 
 // One card of one guest. Goal and reward are copied when the card starts, so changing the program never changes a card in progress.
 model LoyaltyCard {
   id           String    @id @default(uuid()) @db.Uuid
   membershipId String    @db.Uuid
+  // The period the card belongs to. Null once the owner deletes that period, and on cards made before periods existed.
+  programId    String?   @db.Uuid
   goal         Int
   rewardText   String
   completedAt  DateTime?
@@ -234,10 +246,12 @@ model LoyaltyCard {
   expiresAt    DateTime?
   createdAt    DateTime  @default(now())
 
-  membership Membership     @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  membership Membership      @relation(fields: [membershipId], references: [id], onDelete: Cascade)
+  program    LoyaltyProgram? @relation(fields: [programId], references: [id], onDelete: SetNull)
   punches    LoyaltyPunch[]
 
   @@index([membershipId, createdAt])
+  @@index([programId])
 }
 
 // One stamp. The unique (membership, day) is what makes "one per day" true even if the button is tapped twice at once.
@@ -409,8 +423,8 @@ model ShopOrder {
   paidAt          DateTime?
   shippedAt       DateTime?
   deliveredAt     DateTime?
-  business Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
-  items    ShopOrderItem[]
+  business        Business        @relation(fields: [businessId], references: [id], onDelete: Cascade)
+  items           ShopOrderItem[]
 
   @@unique([businessId, freePeriodEnd])
   @@index([businessId, createdAt])
