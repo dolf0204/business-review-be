@@ -15,7 +15,12 @@ const B = '11111111-1111-4111-8111-111111111111';
 const A = '22222222-2222-4222-8222-222222222222';
 const DAY_MS = 86_400_000;
 const URL = `/businesses/${B}/loyalty/actions/${A}/end`;
-const NEXT = { enabled: true, goal: 6, rewardText: 'Free dessert' };
+const NEXT = {
+  enabled: true,
+  goal: 6,
+  rewardText: 'Free dessert',
+  endsAt: new Date(Date.now() + 30 * DAY_MS).toISOString(),
+};
 
 describe('ending the running action', () => {
   const stored = (over = {}) => ({
@@ -29,6 +34,7 @@ describe('ending the running action', () => {
     cardValidDays: null,
     radiusMeters: 150,
     carryOver: 'RESET',
+    standing: false,
     ...over,
   });
 
@@ -78,11 +84,7 @@ describe('ending the running action', () => {
   it('ends the action and starts the next one at the same moment, in one step', async () => {
     const res = await end({
       carryOver: 'TRANSFER',
-      next: {
-        ...NEXT,
-        endsAt: new Date(Date.now() + 30 * DAY_MS).toISOString(),
-        carryOver: 'RESET',
-      },
+      next: { ...NEXT, carryOver: 'RESET' },
     });
     expect(res.statusCode).toBe(201);
     expect(db.$transaction).toHaveBeenCalledTimes(1);
@@ -130,6 +132,37 @@ describe('ending the running action', () => {
       ).statusCode,
     ).toBe(404);
     expect(db.loyaltyProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('refuses a next action without an end date, and one that tries to be the standing offer', async () => {
+    const { endsAt: _unused, ...undated } = NEXT;
+    expect(
+      (await end({ carryOver: 'RESET', next: undated })).json().error,
+    ).toBe('dates_required');
+    await end({ carryOver: 'RESET', next: { ...NEXT, standing: true } });
+    expect(db.loyaltyProgram.create.mock.calls[0]![0].data.standing).toBe(
+      false,
+    );
+  });
+
+  it('does not end the standing offer, which has no end to bring forward', async () => {
+    db.loyaltyProgram.findMany.mockResolvedValue([
+      stored({ standing: true, startsAt: null, endsAt: null }),
+    ]);
+    const res = await end({ carryOver: 'RESET' });
+    expect(res.statusCode).toBe(409);
+    expect(res.json().error).toBe('standing_cannot_end');
+    expect(db.loyaltyProgram.update).not.toHaveBeenCalled();
+  });
+
+  it('ends a dated offer even when a standing offer exists', async () => {
+    db.loyaltyProgram.findMany.mockResolvedValue([
+      stored(),
+      stored({ id: 's', standing: true, startsAt: null, endsAt: null }),
+    ]);
+    expect((await end({ carryOver: 'RESET', next: NEXT })).statusCode).toBe(
+      201,
+    );
   });
 
   it('refuses a next action that runs into a later one, and a business with too many', async () => {

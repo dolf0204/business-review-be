@@ -14,6 +14,7 @@ const db = vi.hoisted(() => ({
   },
   loyaltyCard: { findFirst: vi.fn(), create: vi.fn(), update: vi.fn() },
   loyaltyPunch: { findFirst: vi.fn(), create: vi.fn() },
+  $transaction: vi.fn(),
 }));
 vi.mock('../../../src/db.js', () => ({ prisma: db }));
 
@@ -28,6 +29,7 @@ import {
   MAX_PROGRAMS_PER_BUSINESS,
   periodsOverlap,
   pickProgram,
+  splitPrograms,
   staffCode,
   utcDay,
   windowState,
@@ -228,6 +230,21 @@ describe('loyalty rules', () => {
     expect(pickProgram([], now)).toBeNull();
   });
 
+  it('splits the offers into the dated one guests see and the one standing offer', () => {
+    const now = new Date('2026-04-15T12:00:00Z');
+    const dated = {
+      id: 'd',
+      standing: false,
+      startsAt: new Date('2026-04-10'),
+      endsAt: new Date('2026-04-20'),
+    };
+    const standing = { id: 's', standing: true, startsAt: null, endsAt: null };
+    expect(splitPrograms([standing, dated], now)).toEqual({ dated, standing });
+    expect(splitPrograms([standing], now)).toEqual({ dated: null, standing });
+    expect(splitPrograms([dated], now)).toEqual({ dated, standing: null });
+    expect(splitPrograms([], now)).toEqual({ dated: null, standing: null });
+  });
+
   it('keeps a full card and a card of the current period, moves an unfinished one only when stars are transferred, and drops it otherwise', () => {
     const unfinished = { programId: 'old', completedAt: null };
     expect(cardFate(unfinished, 'new', { carryOver: 'TRANSFER' })).toBe(
@@ -264,6 +281,7 @@ describe('setting up the periods', () => {
     cardValidDays: null,
     radiusMeters: 150,
     carryOver: 'RESET',
+    standing: false,
     ...over,
   });
   const RULE = { enabled: true, goal: 5, rewardText: 'x' };
@@ -371,14 +389,151 @@ describe('setting up the periods', () => {
     );
   });
 
-  it('updates the period guests see now instead of adding a second one', async () => {
-    db.loyaltyProgram.findMany.mockResolvedValue([stored()]);
-    expect((await owner('PUT', { ...RULE, goal: 8 })).statusCode).toBe(200);
+  it('updates the dated offer guests see now instead of adding a second one', async () => {
+    db.loyaltyProgram.findMany.mockResolvedValue([
+      stored({
+        startsAt: new Date('2020-01-01'),
+        endsAt: new Date('2099-01-01'),
+      }),
+    ]);
+    expect(
+      (
+        await owner('PUT', {
+          ...RULE,
+          goal: 8,
+          startsAt: '2020-01-01',
+          endsAt: '2099-01-01',
+        })
+      ).statusCode,
+    ).toBe(200);
     expect(db.loyaltyProgram.create).not.toHaveBeenCalled();
     expect(db.loyaltyProgram.update.mock.calls[0]![0]).toMatchObject({
       where: { id: A },
-      data: { goal: 8 },
+      data: { goal: 8, standing: false },
     });
+  });
+
+  it('treats a rule sent without dates as the standing offer, and updates it instead of adding another', async () => {
+    await owner('PUT', RULE);
+    expect(db.loyaltyProgram.create.mock.calls[0]![0].data).toMatchObject({
+      standing: true,
+      startsAt: null,
+      endsAt: null,
+      carryOver: 'RESET',
+    });
+    db.loyaltyProgram.findMany.mockResolvedValue([stored({ standing: true })]);
+    expect((await owner('PUT', { ...RULE, goal: 8 })).statusCode).toBe(200);
+    expect(db.loyaltyProgram.update.mock.calls[0]![0]).toMatchObject({
+      where: { id: A },
+      data: { goal: 8, standing: true },
+    });
+  });
+
+  it('shows the standing offer as the program when there is one', async () => {
+    const dated = stored({
+      id: 'd',
+      startsAt: new Date('2020-03-01'),
+      endsAt: new Date('2099-01-01'),
+    });
+    db.loyaltyProgram.findMany.mockResolvedValue([
+      dated,
+      stored({ id: 's', standing: true }),
+    ]);
+    expect((await owner('GET')).json().program.id).toBe('s');
+  });
+
+  it('makes a dated offer have both dates', async () => {
+    const url = `/businesses/${B}/loyalty/actions`;
+    for (const dates of [
+      {},
+      { startsAt: '2026-04-01' },
+      { endsAt: '2026-05-01' },
+      { startsAt: '2026-04-01', endsAt: null },
+    ]) {
+      const res = await owner('POST', { ...RULE, ...dates }, url);
+      expect(res.statusCode).toBe(422);
+      expect(res.json().error).toBe('dates_required');
+    }
+    expect(db.loyaltyProgram.create).not.toHaveBeenCalled();
+  });
+
+  it('saves a standing offer without dates next to dated ones, whatever dates and carry over were sent', async () => {
+    db.loyaltyProgram.findMany.mockResolvedValue([
+      stored({
+        startsAt: new Date('2026-04-01'),
+        endsAt: new Date('2026-05-01'),
+      }),
+    ]);
+    const res = await owner(
+      'POST',
+      {
+        ...RULE,
+        standing: true,
+        startsAt: '2026-04-10',
+        endsAt: '2026-04-20',
+        carryOver: 'TRANSFER',
+      },
+      `/businesses/${B}/loyalty/actions`,
+    );
+    expect(res.statusCode).toBe(201);
+    expect(db.loyaltyProgram.create.mock.calls[0]![0].data).toMatchObject({
+      businessId: B,
+      standing: true,
+      startsAt: null,
+      endsAt: null,
+      carryOver: 'RESET',
+    });
+  });
+
+  it('allows only one standing offer per business, but lets that one be changed', async () => {
+    db.loyaltyProgram.findMany.mockResolvedValue([stored({ standing: true })]);
+    const second = await owner(
+      'POST',
+      { ...RULE, standing: true },
+      `/businesses/${B}/loyalty/actions`,
+    );
+    expect(second.statusCode).toBe(409);
+    expect(second.json().error).toBe('standing_exists');
+    expect(
+      (
+        await owner(
+          'PUT',
+          { ...RULE, standing: true, goal: 7 },
+          `/businesses/${B}/loyalty/actions/${A}`,
+        )
+      ).statusCode,
+    ).toBe(200);
+    const other = '33333333-3333-4333-8333-333333333333';
+    db.loyaltyProgram.findMany.mockResolvedValue([
+      stored({ standing: true }),
+      stored({
+        id: other,
+        startsAt: new Date('2026-04-01'),
+        endsAt: new Date('2026-05-01'),
+      }),
+    ]);
+    expect(
+      (
+        await owner(
+          'PUT',
+          { ...RULE, standing: true },
+          `/businesses/${B}/loyalty/actions/${other}`,
+        )
+      ).json().error,
+    ).toBe('standing_exists');
+  });
+
+  it('does not let a standing offer block dated offers', async () => {
+    db.loyaltyProgram.findMany.mockResolvedValue([stored({ standing: true })]);
+    expect(
+      (
+        await owner(
+          'POST',
+          { ...RULE, startsAt: '2026-04-01', endsAt: '2026-05-01' },
+          `/businesses/${B}/loyalty/actions`,
+        )
+      ).statusCode,
+    ).toBe(201);
   });
 
   it('saves how many days a card lasts, clears it with null, leaves it alone when missing, and refuses 0 or more than 730', async () => {
@@ -540,6 +695,7 @@ describe('stamps', () => {
   const PROGRAM = {
     id: 'p1',
     carryOver: 'RESET',
+    standing: false,
     enabled: true,
     goal: 3,
     rewardText: 'Free meal',
@@ -591,6 +747,9 @@ describe('stamps', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    db.$transaction.mockImplementation((ops: Promise<unknown>[]) =>
+      Promise.all(ops),
+    );
     db.guest.findUnique.mockResolvedValue({ id: 'g1' });
     db.business.findUnique.mockResolvedValue(BIZ);
     db.membership.findUnique.mockResolvedValue({ id: 'm1' });
@@ -940,6 +1099,181 @@ describe('stamps', () => {
         completedAt: expect.any(Date),
       });
       expect(db.loyaltyPunch.create).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('with a standing offer next to the dated one', () => {
+    const STANDING = {
+      ...PROGRAM,
+      id: 's1',
+      standing: true,
+      goal: 5,
+      rewardText: 'Free coffee',
+      startsAt: null,
+      endsAt: null,
+    };
+    const standingCard = (punches: number, over = {}) =>
+      card(punches, {
+        id: 'c2',
+        programId: 's1',
+        goal: 5,
+        rewardText: 'Free coffee',
+        ...over,
+      });
+    const cards = (dated: object | null, standing: object | null) =>
+      db.loyaltyCard.findFirst.mockImplementation(
+        async ({
+          where,
+        }: {
+          where: { program?: { is?: { standing?: boolean } } };
+        }) => (where.program?.is?.standing === true ? standing : dated),
+      );
+    beforeEach(() => {
+      db.business.findUnique.mockResolvedValue({
+        ...BIZ,
+        loyaltyPrograms: [PROGRAM, STANDING],
+      });
+    });
+
+    it('shows both cards, the standing one under its own key', async () => {
+      cards(card(2), standingCard(1));
+      const json = (await call('/guest/b/abcd2345/loyalty')).json();
+      expect(json).toMatchObject({
+        program: { goal: 3, standing: false },
+        card: { punches: 2, goal: 3 },
+        standing: {
+          program: { goal: 5, standing: true, window: 'active' },
+          card: { punches: 1, goal: 5 },
+        },
+      });
+    });
+
+    it('shows no standing offer when the business has none', async () => {
+      db.business.findUnique.mockResolvedValue(BIZ);
+      expect(
+        (await call('/guest/b/abcd2345/loyalty')).json().standing,
+      ).toBeNull();
+    });
+
+    it('gives a star to both cards on one visit', async () => {
+      cards(card(0), standingCard(0));
+      expect(
+        (await call('/guest/b/abcd2345/loyalty/punch', HERE)).statusCode,
+      ).toBe(200);
+      expect(
+        db.loyaltyPunch.create.mock.calls.map((c) => c[0].data.cardId).sort(),
+      ).toEqual(['c1', 'c2']);
+      expect(
+        db.loyaltyPunch.create.mock.calls.every((c) => c[0].data.day === TODAY),
+      ).toBe(true);
+    });
+
+    it('starts a card for each offer that has none', async () => {
+      cards(null, null);
+      db.loyaltyCard.create.mockImplementation(
+        async ({ data }: { data: { programId: string } }) =>
+          card(0, {
+            id: data.programId === 's1' ? 'c2' : 'c1',
+            programId: data.programId,
+          }),
+      );
+      await call('/guest/b/abcd2345/loyalty/punch', HERE);
+      expect(
+        db.loyaltyCard.create.mock.calls.map((c) => c[0].data.programId).sort(),
+      ).toEqual(['p1', 's1']);
+    });
+
+    it('keeps stamping the standing offer after the dated period has ended', async () => {
+      db.business.findUnique.mockResolvedValue({
+        ...BIZ,
+        loyaltyPrograms: [
+          { ...PROGRAM, endsAt: new Date(Date.now() - 1000) },
+          STANDING,
+        ],
+      });
+      cards(card(1), standingCard(1));
+      expect(
+        (await call('/guest/b/abcd2345/loyalty/punch', HERE)).statusCode,
+      ).toBe(200);
+      expect(
+        db.loyaltyPunch.create.mock.calls.map((c) => c[0].data.cardId),
+      ).toEqual(['c2']);
+    });
+
+    it('keeps stamping the standing card while the dated card is full, and the other way round', async () => {
+      cards(card(3, { completedAt: new Date() }), standingCard(1));
+      expect(
+        (await call('/guest/b/abcd2345/loyalty/punch', HERE)).statusCode,
+      ).toBe(200);
+      expect(
+        db.loyaltyPunch.create.mock.calls.map((c) => c[0].data.cardId),
+      ).toEqual(['c2']);
+      db.loyaltyPunch.create.mockClear();
+      cards(card(1), standingCard(5, { completedAt: new Date() }));
+      await call('/guest/b/abcd2345/loyalty/punch', HERE);
+      expect(
+        db.loyaltyPunch.create.mock.calls.map((c) => c[0].data.cardId),
+      ).toEqual(['c1']);
+    });
+
+    it('refuses when both cards are full', async () => {
+      cards(
+        card(3, { completedAt: new Date() }),
+        standingCard(5, { completedAt: new Date() }),
+      );
+      expect(
+        (await call('/guest/b/abcd2345/loyalty/punch', HERE)).json().error,
+      ).toBe('card_complete');
+      expect(db.loyaltyPunch.create).not.toHaveBeenCalled();
+    });
+
+    it('completes the card whose goal the stamp reaches, and only that one', async () => {
+      cards(card(1), standingCard(4));
+      await call('/guest/b/abcd2345/loyalty/punch', HERE);
+      const updates = db.loyaltyCard.update.mock.calls.map((c) => c[0]);
+      expect(updates).toHaveLength(1);
+      expect(updates[0]).toMatchObject({
+        where: { id: 'c2' },
+        data: { completedAt: expect.any(Date), goal: 5 },
+      });
+    });
+
+    it('stamps once per day for the visit', async () => {
+      db.loyaltyPunch.findFirst.mockResolvedValue({ day: TODAY });
+      expect(
+        (await call('/guest/b/abcd2345/loyalty/punch', HERE)).json().error,
+      ).toBe('already_punched_today');
+    });
+
+    it('redeems the standing card only when asked to, and leaves the dated one', async () => {
+      cards(
+        card(3, { completedAt: new Date() }),
+        standingCard(5, { completedAt: new Date() }),
+      );
+      await call('/guest/b/abcd2345/loyalty/redeem', {
+        staffCode: code(),
+        standing: true,
+      });
+      expect(
+        db.loyaltyCard.update.mock.calls.map((c) => c[0].where.id),
+      ).toEqual(['c2']);
+      db.loyaltyCard.update.mockClear();
+      await call('/guest/b/abcd2345/loyalty/redeem', { staffCode: code() });
+      expect(
+        db.loyaltyCard.update.mock.calls.map((c) => c[0].where.id),
+      ).toEqual(['c1']);
+    });
+
+    it('has nothing to redeem when the business has no standing offer', async () => {
+      db.business.findUnique.mockResolvedValue(BIZ);
+      expect(
+        (
+          await call('/guest/b/abcd2345/loyalty/redeem', {
+            staffCode: code(),
+            standing: true,
+          })
+        ).json().error,
+      ).toBe('no_program');
     });
   });
 

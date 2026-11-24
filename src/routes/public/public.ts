@@ -7,7 +7,7 @@ import { isLive } from '../../lib/business/live.js';
 import { SLUG_MAX_LENGTH, SLUG_MIN_LENGTH } from '../../lib/slug/slug.js';
 import { couponOpen } from '../engage/coupons.js';
 import { publicBusiness } from '../../lib/business/businessView.js';
-import { pickProgram } from '../../lib/engage/loyalty.js';
+import { splitPrograms } from '../../lib/engage/loyalty.js';
 
 const PAGE_LIMIT = { max: 120, timeWindow: '1 minute' };
 
@@ -22,7 +22,7 @@ async function guestPage(b: Business, reply: FastifyReply) {
     orderBy: { createdAt: 'desc' },
     take: 5,
   });
-  const loyalty = pickProgram(
+  const { dated, standing } = splitPrograms(
     await prisma.loyaltyProgram.findMany({
       where: { businessId: b.id, enabled: true },
     }),
@@ -36,7 +36,7 @@ async function guestPage(b: Business, reply: FastifyReply) {
     })
   ).filter((c) => couponOpen(c, now));
   reply.header('cache-control', 'no-cache');
-  return publicBusiness(b, posts, loyalty, coupons);
+  return publicBusiness(b, posts, dated, coupons, standing);
 }
 
 /** What a guest can read. Only published businesses exist here; everything else answers not found. */

@@ -225,6 +225,7 @@ model LoyaltyProgram {
   radiusMeters  Int              @default(150)
   // What happens to unfinished cards when this period ends. The owner can change it until the cards are moved.
   carryOver     LoyaltyCarryOver @default(RESET)
+  standing      Boolean          @default(false)
   updatedAt     DateTime         @updatedAt
 
   business Business      @relation(fields: [businessId], references: [id], onDelete: Cascade)
@@ -254,7 +255,7 @@ model LoyaltyCard {
   @@index([programId])
 }
 
-// One stamp. The unique (membership, day) is what makes "one per day" true even if the button is tapped twice at once.
+// One stamp. The unique (card, day) is what makes "one per day on a card" true even if the button is tapped twice at once.
 model LoyaltyPunch {
   id             String        @id @default(uuid()) @db.Uuid
   cardId         String        @db.Uuid
@@ -267,8 +268,8 @@ model LoyaltyPunch {
   card       LoyaltyCard @relation(fields: [cardId], references: [id], onDelete: Cascade)
   membership Membership  @relation(fields: [membershipId], references: [id], onDelete: Cascade)
 
-  @@unique([membershipId, day])
-  @@index([cardId])
+  @@unique([cardId, day])
+  @@index([membershipId, day])
 }
 
 enum CampaignStatus {

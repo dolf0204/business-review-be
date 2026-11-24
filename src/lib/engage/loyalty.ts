@@ -37,6 +37,20 @@ export function periodsOverlap(a: Period, b: Period): boolean {
   return aStart < bEnd && bStart < aEnd;
 }
 
+/** The running offers of a business, split: the dated ones (one is picked for guests) and the single standing one with no end. */
+export function splitPrograms<T extends Period & { standing: boolean }>(
+  programs: T[],
+  now: Date,
+): { dated: T | null; standing: T | null } {
+  return {
+    dated: pickProgram(
+      programs.filter((p) => !p.standing),
+      now,
+    ),
+    standing: programs.find((p) => p.standing) ?? null,
+  };
+}
+
 /** The period guests deal with now: the running one, else the next to start, else the one that ended last. */
 export function pickProgram<T extends Period>(
   programs: T[],
